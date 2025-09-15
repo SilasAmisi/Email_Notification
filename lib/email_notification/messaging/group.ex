@@ -4,7 +4,6 @@ defmodule EmailNotification.Messaging.Group do
 
   schema "groups" do
     field :name, :string
-    field :user_id, :id
 
     timestamps(type: :utc_datetime)
   end

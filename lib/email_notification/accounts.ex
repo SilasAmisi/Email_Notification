@@ -5,20 +5,17 @@ defmodule EmailNotification.Accounts do
 
   import Ecto.Query, warn: false
   alias EmailNotification.Repo
-
   alias EmailNotification.Accounts.User
 
   @doc """
   Returns the list of users.
 
   ## Examples
-
       iex> list_users()
       [%User{}, ...]
-
   """
   def list_users do
-    raise "TODO"
+    Repo.all(User)
   end
 
   @doc """
@@ -27,71 +24,62 @@ defmodule EmailNotification.Accounts do
   Raises if the User does not exist.
 
   ## Examples
-
       iex> get_user!(123)
       %User{}
-
   """
-  def get_user!(id), do: raise "TODO"
+  def get_user!(id), do: Repo.get!(User, id)
 
   @doc """
   Creates a user.
 
   ## Examples
-
       iex> create_user(%{field: value})
       {:ok, %User{}}
-
       iex> create_user(%{field: bad_value})
       {:error, ...}
-
   """
   def create_user(attrs) do
-    raise "TODO"
+    %User{}
+    |> User.changeset(attrs)
+    |> Repo.insert()
   end
 
   @doc """
   Updates a user.
 
   ## Examples
-
       iex> update_user(user, %{field: new_value})
       {:ok, %User{}}
-
       iex> update_user(user, %{field: bad_value})
       {:error, ...}
-
   """
   def update_user(%User{} = user, attrs) do
-    raise "TODO"
+    user
+    |> User.changeset(attrs)
+    |> Repo.update()
   end
 
   @doc """
   Deletes a User.
 
   ## Examples
-
       iex> delete_user(user)
       {:ok, %User{}}
-
       iex> delete_user(user)
       {:error, ...}
-
   """
   def delete_user(%User{} = user) do
-    raise "TODO"
+    Repo.delete(user)
   end
 
   @doc """
   Returns a data structure for tracking user changes.
 
   ## Examples
-
       iex> change_user(user)
-      %Todo{...}
-
+      %Ecto.Changeset{data: %User{}}
   """
-  def change_user(%User{} = user, _attrs \\ %{}) do
-    raise "TODO"
+  def change_user(%User{} = user, attrs \\ %{}) do
+    User.changeset(user, attrs)
   end
 end

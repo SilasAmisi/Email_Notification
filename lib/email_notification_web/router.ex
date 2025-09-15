@@ -14,24 +14,30 @@ defmodule EmailNotificationWeb.Router do
     plug :accepts, ["json"]
   end
 
+  # Single-page MVP routes
   scope "/", EmailNotificationWeb do
     pipe_through :browser
 
     get "/", PageController, :home
+    post "/create_contact", PageController, :create_contact
+    post "/create_group", PageController, :create_group
+    post "/create_group_contact", PageController, :create_group_contact
+    post "/create_email", PageController, :create_email
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", EmailNotificationWeb do
-  #   pipe_through :api
-  # end
+  # API routes
+  scope "/api", EmailNotificationWeb do
+    pipe_through :api
+
+    resources "/users", UserController, except: [:new, :edit]
+    resources "/contacts", ContactController, except: [:new, :edit]
+    resources "/group_contacts", GroupContactController, except: [:new, :edit]
+    resources "/groups", GroupController, except: [:new, :edit]
+    resources "/emails", EmailController, except: [:new, :edit]
+  end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:email_notification, :dev_routes) do
-    # If you want to use the LiveDashboard in production, you should put
-    # it behind authentication and allow only admins to access it.
-    # If your application does not have an admins-only section yet,
-    # you can use Plug.BasicAuth to set up some basic authentication
-    # as long as you are also using SSL (which you should anyway).
     import Phoenix.LiveDashboard.Router
 
     scope "/dev" do

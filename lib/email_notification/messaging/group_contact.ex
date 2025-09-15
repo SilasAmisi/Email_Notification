@@ -3,7 +3,6 @@ defmodule EmailNotification.Messaging.GroupContact do
   import Ecto.Changeset
 
   schema "group_contacts" do
-
     field :group_id, :id
     field :contact_id, :id
 
@@ -13,7 +12,7 @@ defmodule EmailNotification.Messaging.GroupContact do
   @doc false
   def changeset(group_contact, attrs) do
     group_contact
-    |> cast(attrs, [])
-    |> validate_required([])
+    |> cast(attrs, [:group_id, :contact_id])
+    |> validate_required([:group_id, :contact_id])
   end
 end

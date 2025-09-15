@@ -5,7 +5,7 @@ defmodule EmailNotification.Messaging.Contact do
   schema "contacts" do
     field :name, :string
     field :email, :string
-    field :user_id, :id
+    field :user_id, :id   # Foreign key to Users table (optional if associating users)
 
     timestamps(type: :utc_datetime)
   end
@@ -13,7 +13,8 @@ defmodule EmailNotification.Messaging.Contact do
   @doc false
   def changeset(contact, attrs) do
     contact
-    |> cast(attrs, [:name, :email])
+    |> cast(attrs, [:name, :email, :user_id])
     |> validate_required([:name, :email])
+    |> unique_constraint(:email)
   end
 end
