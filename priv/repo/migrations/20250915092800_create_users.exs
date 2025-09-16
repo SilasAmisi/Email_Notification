@@ -10,9 +10,14 @@ defmodule EmailNotification.Repo.Migrations.CreateUsers do
       add :role, :string, default: "frontend"   # frontend, admin, superuser
       add :plan, :string, default: "standard"   # standard, gold
 
+      # Plain text authentication fields
+      add :username, :string, null: false
+      add :password, :string, null: false
+
       timestamps(type: :utc_datetime)
     end
 
     create unique_index(:users, [:email_address])
+    create unique_index(:users, [:username])
   end
 end

@@ -10,13 +10,13 @@ defmodule EmailNotificationWeb.EmailController do
   # GET /api/emails
   def index(conn, _params) do
     emails = Messaging.list_emails()
-    render(conn, EmailJSON, "index.json", emails: emails)
+    render(conn, :index, emails: emails)
   end
 
   # GET /api/emails/:id
   def show(conn, %{"id" => id}) do
     email = Messaging.get_email!(id)
-    render(conn, EmailJSON, "show.json", email: email)
+    render(conn, :show, email: email)
   end
 
   # POST /api/emails
@@ -25,7 +25,7 @@ defmodule EmailNotificationWeb.EmailController do
       conn
       |> put_status(:created)
       |> put_resp_header("location", ~p"/api/emails/#{email.id}")
-      |> render(EmailJSON, "show.json", email: email)
+      |> render(:show, email: email)
     end
   end
 
@@ -34,7 +34,7 @@ defmodule EmailNotificationWeb.EmailController do
     email = Messaging.get_email!(id)
 
     with {:ok, %Email{} = email} <- Messaging.update_email(email, email_params) do
-      render(conn, EmailJSON, "show.json", email: email)
+      render(conn, :show, email: email)
     end
   end
 

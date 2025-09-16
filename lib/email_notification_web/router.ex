@@ -29,7 +29,14 @@ defmodule EmailNotificationWeb.Router do
   scope "/api", EmailNotificationWeb do
     pipe_through :api
 
+    # User management
     resources "/users", UserController, except: [:new, :edit]
+
+    # Authentication (under /users)
+    post "/users/register", UserController, :register
+    post "/users/login", UserController, :login
+
+    # Other resources
     resources "/contacts", ContactController, except: [:new, :edit]
     resources "/group_contacts", GroupContactController, except: [:new, :edit]
     resources "/groups", GroupController, except: [:new, :edit]
