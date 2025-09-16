@@ -10,13 +10,14 @@ defmodule EmailNotification.Accounts.User do
     field :role, :string, default: "frontend"   # frontend, admin, superuser
     field :plan, :string, default: "standard"   # standard, gold
     field :username, :string
-    field :password, :string   # plain text storage (⚠️ not secure, but as per your request)
+    field :password, :string   # ⚠️ stored as plain text (not secure)
 
     timestamps(type: :utc_datetime)
   end
 
   @doc """
-  Regular changeset (for updates)
+  Generic changeset (used for updates & admin create).
+  Allows setting role/plan explicitly.
   """
   def changeset(user, attrs) do
     user
@@ -31,16 +32,29 @@ defmodule EmailNotification.Accounts.User do
       :password
     ])
     |> validate_required([:first_name, :last_name, :email_address, :username, :password])
+    |> validate_format(:email_address, ~r/@/)  # ensure it's a valid email format
     |> unique_constraint(:email_address)
     |> unique_constraint(:username)
   end
 
   @doc """
-  Registration changeset
+  Registration changeset (used for self-service signup).
+  Does NOT allow overriding role/plan – they stay defaults.
   """
   def registration_changeset(user, attrs) do
     user
-    |> changeset(attrs)
+    |> cast(attrs, [
+      :first_name,
+      :last_name,
+      :email_address,
+      :msisdn,
+      :username,
+      :password
+    ])
+    |> validate_required([:first_name, :last_name, :email_address, :username, :password])
     |> validate_length(:password, min: 6)
+    |> validate_format(:email_address, ~r/@/)
+    |> unique_constraint(:email_address)
+    |> unique_constraint(:username)
   end
 end

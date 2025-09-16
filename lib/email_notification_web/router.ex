@@ -14,36 +14,65 @@ defmodule EmailNotificationWeb.Router do
     plug :accepts, ["json"]
   end
 
-  # Single-page MVP routes
+  # -------------------------------
+  # Single-page MVP routes (Browser HTML)
+  # -------------------------------
   scope "/", EmailNotificationWeb do
     pipe_through :browser
 
+    # Dashboard
     get "/", PageController, :home
-    post "/create_contact", PageController, :create_contact
-    post "/create_group", PageController, :create_group
-    post "/create_group_contact", PageController, :create_group_contact
-    post "/create_email", PageController, :create_email
+
+    # Auth (for forms)
+    post "/users/register", UserController, :register
+    post "/users/login", UserController, :login
+    get  "/users/logout", UserController, :logout   # 👈 Added logout
+    post "/users/delete", UserController, :delete
+    post "/users/admin", UserController, :update_admin
+    post "/users/upgrade", UserController, :upgrade
+
+    # Contacts
+    resources "/contacts", ContactController, only: [:create]
+
+    # Emails
+    resources "/emails", EmailController, only: [:create]
+    post "/emails/group", EmailController, :send_group
+    post "/emails/retry", EmailController, :retry_failed_browser
+
+    # Groups
+    resources "/groups", GroupController, only: [:create]
+
+    # Group-Contacts
+    resources "/group_contacts", GroupContactController, only: [:create]
   end
 
-  # API routes
+  # -------------------------------
+  # API routes (JSON only)
+  # -------------------------------
   scope "/api", EmailNotificationWeb do
     pipe_through :api
 
-    # User management
-    resources "/users", UserController, except: [:new, :edit]
-
-    # Authentication (under /users)
+    # Auth (no CSRF here)
     post "/users/register", UserController, :register
     post "/users/login", UserController, :login
+    delete "/users/logout", UserController, :logout  # 👈 Added logout for API
 
-    # Other resources
+    # Resources
+    resources "/users", UserController, except: [:new, :edit]
     resources "/contacts", ContactController, except: [:new, :edit]
-    resources "/group_contacts", GroupContactController, except: [:new, :edit]
-    resources "/groups", GroupController, except: [:new, :edit]
     resources "/emails", EmailController, except: [:new, :edit]
+    resources "/groups", GroupController, except: [:new, :edit]
+    resources "/group_contacts", GroupContactController, except: [:new, :edit]
+
+    # Extra actions
+    post "/emails/:id/retry", EmailController, :retry_failed_api
+    post "/groups/:id/send_emails", GroupController, :send_emails
+    get "/groups/:id/email_status", GroupController, :email_status
   end
 
-  # Enable LiveDashboard and Swoosh mailbox preview in development
+  # -------------------------------
+  # Dev-only routes
+  # -------------------------------
   if Application.compile_env(:email_notification, :dev_routes) do
     import Phoenix.LiveDashboard.Router
 

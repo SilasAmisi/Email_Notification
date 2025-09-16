@@ -5,10 +5,11 @@ defmodule EmailNotification.Messaging.Email do
   schema "emails" do
     field :subject, :string
     field :body, :string
-    field :status, :string
-    field :user_id, :id
-    field :contact_id, :id
-    field :group_id, :id
+    field :status, :string, default: "pending"
+
+    belongs_to :user, EmailNotification.Accounts.User
+    belongs_to :contact, EmailNotification.Messaging.Contact
+    belongs_to :group, EmailNotification.Messaging.Group
 
     timestamps(type: :utc_datetime)
   end
@@ -18,7 +19,6 @@ defmodule EmailNotification.Messaging.Email do
     email
     |> cast(attrs, [:subject, :body, :status, :user_id, :contact_id, :group_id])
     |> validate_required([:subject, :body, :status])
-    # optionally, add a custom validation to ensure at least one association is present
     |> validate_assoc_presence()
   end
 

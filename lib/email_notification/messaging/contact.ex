@@ -5,7 +5,8 @@ defmodule EmailNotification.Messaging.Contact do
   schema "contacts" do
     field :name, :string
     field :email, :string
-    field :user_id, :id   # Foreign key to Users table (optional if associating users)
+
+    belongs_to :user, EmailNotification.Accounts.User
 
     timestamps(type: :utc_datetime)
   end

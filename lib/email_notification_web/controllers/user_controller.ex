@@ -8,35 +8,37 @@ defmodule EmailNotificationWeb.UserController do
 
   action_fallback EmailNotificationWeb.FallbackController
 
-  # ====================
-  # HELPER: Get logged-in user (stub for now – replace with token/session later)
-  # ====================
-  defp get_current_user(conn) do
-    # For now, assume user_id is passed in headers (e.g., "x-user-id")
-    case Plug.Conn.get_req_header(conn, "x-user-id") do
-      [id] ->
-        Repo.get(User, id)
+  # ==================================================
+  # HELPERS
+  # ==================================================
 
-      _ ->
-        nil
+  # Get logged-in user (first check session, then header for API clients)
+  defp get_current_user(conn) do
+    case get_session(conn, :user_id) do
+      nil ->
+        case Plug.Conn.get_req_header(conn, "x-user-id") do
+          [id] -> Repo.get(User, id)
+          _ -> nil
+        end
+
+      user_id ->
+        Repo.get(User, user_id)
     end
   end
 
   defp authorize_admin!(%User{role: "admin"}), do: :ok
   defp authorize_admin!(_), do: {:error, :forbidden}
 
-  # ====================
+  # ==================================================
   # ACTIONS
-  # ====================
+  # ==================================================
 
   # List all users (admin only)
   def index(conn, _params) do
     with %User{} = current <- get_current_user(conn),
          :ok <- authorize_admin!(current) do
       users = Accounts.list_users()
-      conn
-      |> put_view(UserJSON)
-      |> render("index.json", users: users)
+      conn |> put_view(UserJSON) |> render("index.json", users: users)
     else
       _ -> send_resp(conn, :forbidden, "Access denied")
     end
@@ -48,32 +50,42 @@ defmodule EmailNotificationWeb.UserController do
     user = Accounts.get_user!(id)
 
     cond do
-      current && current.role == "admin" ->
-        render_user(conn, user)
-
-      current && current.id == user.id ->
-        render_user(conn, user)
-
-      true ->
-        send_resp(conn, :forbidden, "Access denied")
+      current && current.role == "admin" -> render_user(conn, user)
+      current && current.id == user.id -> render_user(conn, user)
+      true -> send_resp(conn, :forbidden, "Access denied")
     end
   end
 
-  # Create user (admin only)
+  # Create user (admin-only unless first user)
   def create(conn, %{"user" => user_params}) do
-    with %User{} = current <- get_current_user(conn),
-         :ok <- authorize_admin!(current),
-         {:ok, user} <- Accounts.create_user(user_params) do
-      conn
-      |> put_status(:created)
-      |> put_view(UserJSON)
-      |> render("show.json", user: user)
-    else
-      {:error, changeset} ->
-        conn |> put_status(:unprocessable_entity) |> json(%{errors: changeset})
+    user_params = normalize_email_params(user_params)
 
-      _ ->
-        send_resp(conn, :forbidden, "Access denied")
+    if Accounts.list_users() == [] do
+      case Accounts.create_user(user_params) do
+        {:ok, user} ->
+          conn
+          |> put_status(:created)
+          |> put_view(UserJSON)
+          |> render("show.json", user: user)
+
+        {:error, changeset} ->
+          conn |> put_status(:unprocessable_entity) |> json(%{errors: changeset})
+      end
+    else
+      with %User{} = current <- get_current_user(conn),
+           :ok <- authorize_admin!(current),
+           {:ok, user} <- Accounts.create_user(user_params) do
+        conn
+        |> put_status(:created)
+        |> put_view(UserJSON)
+        |> render("show.json", user: user)
+      else
+        {:error, changeset} ->
+          conn |> put_status(:unprocessable_entity) |> json(%{errors: changeset})
+
+        _ ->
+          send_resp(conn, :forbidden, "Access denied")
+      end
     end
   end
 
@@ -82,23 +94,18 @@ defmodule EmailNotificationWeb.UserController do
     current = get_current_user(conn)
     user = Accounts.get_user!(id)
 
+    user_params = normalize_email_params(user_params)
+
     cond do
-      current && current.role == "admin" ->
-        do_update(conn, user, user_params)
-
-      current && current.id == user.id ->
-        do_update(conn, user, user_params)
-
-      true ->
-        send_resp(conn, :forbidden, "Access denied")
+      current && current.role == "admin" -> do_update(conn, user, user_params)
+      current && current.id == user.id -> do_update(conn, user, user_params)
+      true -> send_resp(conn, :forbidden, "Access denied")
     end
   end
 
   defp do_update(conn, user, user_params) do
     case Accounts.update_user(user, user_params) do
-      {:ok, user} ->
-        render_user(conn, user)
-
+      {:ok, user} -> render_user(conn, user)
       {:error, changeset} ->
         conn |> put_status(:unprocessable_entity) |> json(%{errors: changeset})
     end
@@ -116,13 +123,16 @@ defmodule EmailNotificationWeb.UserController do
     end
   end
 
-  # Registration endpoint (open to anyone)
+  # Registration endpoint (open)
   def register(conn, %{"user" => user_params}) do
+    user_params = normalize_email_params(user_params)
     changeset = User.registration_changeset(%User{}, user_params)
 
     case Repo.insert(changeset) do
       {:ok, user} ->
         conn
+        |> put_session(:user_id, user.id)    # auto-login after register
+        |> configure_session(renew: true)
         |> put_status(:created)
         |> put_view(UserJSON)
         |> render("show.json", user: user)
@@ -132,51 +142,107 @@ defmodule EmailNotificationWeb.UserController do
     end
   end
 
-  # Login endpoint (username or email)
-  def login(conn, %{"username" => username, "password" => password}),
-    do: do_login(conn, %{username: username, password: password})
-
-  def login(conn, %{"email" => email, "password" => password}),
-    do: do_login(conn, %{email: email, password: password})
-
-  def login(conn, _params),
-    do: conn |> put_status(:bad_request) |> json(%{error: "Missing username/email or password"})
-
-  # Shared login logic
-  defp do_login(conn, %{username: username, password: password}) do
-    case Repo.get_by(User, username: username) do
-      nil -> invalid_credentials(conn)
-      user -> check_password(conn, user, password)
-    end
-  end
-
-  defp do_login(conn, %{email: email, password: password}) do
+  # Login (session-based + JSON)
+  def login(conn, %{"email_address" => email, "password" => password}) do
     case Repo.get_by(User, email_address: email) do
       nil -> invalid_credentials(conn)
-      user -> check_password(conn, user, password)
+      user ->
+        if user.password == password do
+          conn
+          |> put_session(:user_id, user.id)   # persist session
+          |> configure_session(renew: true)
+          |> json(%{
+            message: "Login successful",
+            user_id: user.id,
+            username: user.username,
+            role: user.role
+          })
+        else
+          invalid_credentials(conn)
+        end
     end
   end
 
-  defp check_password(conn, user, password) do
-    if user.password == password do
-      conn
-      |> json(%{
-        message: "Login successful",
-        user_id: user.id,
-        username: user.username,
-        role: user.role
-      })
-    else
-      invalid_credentials(conn)
+  def login(conn, _params),
+    do: conn |> put_status(:bad_request) |> json(%{error: "Missing email or password"})
+
+  # Logout (clear session)
+  def logout(conn, _params) do
+    conn
+    |> configure_session(drop: true)
+    |> redirect(to: "/")
+  end
+
+  # Manage admin rights (grant/revoke)
+  def update_admin(conn, %{"user_id" => user_id, "action" => action}) do
+    case Repo.get(User, user_id) do
+      nil ->
+        conn
+        |> put_flash(:error, "User not found")
+        |> redirect(to: "/")
+
+      user ->
+        new_role =
+          case action do
+            "grant" -> "admin"
+            "revoke" -> "frontend"
+            _ -> user.role
+          end
+
+        case Accounts.update_user(user, %{"role" => new_role}) do
+          {:ok, _updated} ->
+            conn
+            |> put_flash(:info, "User role updated")
+            |> redirect(to: "/")
+
+          {:error, _changeset} ->
+            conn
+            |> put_flash(:error, "Failed to update role")
+            |> redirect(to: "/")
+        end
+    end
+  end
+
+  # Upgrade user to gold plan
+  def upgrade(conn, %{"user_id" => user_id}) do
+    case Repo.get(User, user_id) do
+      nil ->
+        conn
+        |> put_flash(:error, "User not found")
+        |> redirect(to: "/")
+
+      user ->
+        case Accounts.update_user(user, %{"plan" => "gold"}) do
+          {:ok, _updated} ->
+            conn
+            |> put_flash(:info, "User upgraded to gold")
+            |> redirect(to: "/")
+
+          {:error, _changeset} ->
+            conn
+            |> put_flash(:error, "Failed to upgrade user")
+            |> redirect(to: "/")
+        end
     end
   end
 
   defp invalid_credentials(conn),
     do: conn |> put_status(:unauthorized) |> json(%{error: "Invalid credentials"})
 
+  # ==================================================
+  # HELPERS
+  # ==================================================
+
   defp render_user(conn, user) do
     conn
     |> put_view(UserJSON)
     |> render("show.json", user: user)
+  end
+
+  # Normalize keys so both "email" and "email_address" params are accepted
+  defp normalize_email_params(params) do
+    params
+    |> Map.drop(["email"]) # drop old key if present
+    |> Map.put_new("email_address", params["email"] || params["email_address"])
   end
 end
