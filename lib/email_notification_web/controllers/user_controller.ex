@@ -26,14 +26,19 @@ defmodule EmailNotificationWeb.UserController do
     end
   end
 
+  # Authorization helpers
   defp authorize_admin!(%User{role: "admin"}), do: :ok
+  defp authorize_admin!(%User{superuser: true}), do: :ok
   defp authorize_admin!(_), do: {:error, :forbidden}
+
+  defp authorize_superuser!(%User{superuser: true}), do: :ok
+  defp authorize_superuser!(_), do: {:error, :forbidden}
 
   # ==================================================
   # ACTIONS
   # ==================================================
 
-  # List all users (admin only)
+  # List all users (admin or superuser only)
   def index(conn, _params) do
     with %User{} = current <- get_current_user(conn),
          :ok <- authorize_admin!(current) do
@@ -44,19 +49,20 @@ defmodule EmailNotificationWeb.UserController do
     end
   end
 
-  # Show a single user (self or admin)
+  # Show a single user (self, admin, or superuser)
   def show(conn, %{"id" => id}) do
     current = get_current_user(conn)
     user = Accounts.get_user!(id)
 
     cond do
+      current && current.superuser -> render_user(conn, user)
       current && current.role == "admin" -> render_user(conn, user)
       current && current.id == user.id -> render_user(conn, user)
       true -> send_resp(conn, :forbidden, "Access denied")
     end
   end
 
-  # Create user (admin-only unless first user)
+  # Create user (admin or superuser unless first user)
   def create(conn, %{"user" => user_params}) do
     user_params = normalize_email_params(user_params)
 
@@ -89,7 +95,7 @@ defmodule EmailNotificationWeb.UserController do
     end
   end
 
-  # Update user (self or admin)
+  # Update user (self, admin, or superuser)
   def update(conn, %{"id" => id, "user" => user_params}) do
     current = get_current_user(conn)
     user = Accounts.get_user!(id)
@@ -97,6 +103,7 @@ defmodule EmailNotificationWeb.UserController do
     user_params = normalize_email_params(user_params)
 
     cond do
+      current && current.superuser -> do_update(conn, user, user_params)
       current && current.role == "admin" -> do_update(conn, user, user_params)
       current && current.id == user.id -> do_update(conn, user, user_params)
       true -> send_resp(conn, :forbidden, "Access denied")
@@ -111,7 +118,7 @@ defmodule EmailNotificationWeb.UserController do
     end
   end
 
-  # Delete user (admin only)
+  # Delete user (admin or superuser only)
   def delete(conn, %{"id" => id}) do
     with %User{} = current <- get_current_user(conn),
          :ok <- authorize_admin!(current),
@@ -155,7 +162,8 @@ defmodule EmailNotificationWeb.UserController do
             message: "Login successful",
             user_id: user.id,
             username: user.username,
-            role: user.role
+            role: user.role,
+            superuser: user.superuser
           })
         else
           invalid_credentials(conn)
@@ -173,33 +181,34 @@ defmodule EmailNotificationWeb.UserController do
     |> redirect(to: "/")
   end
 
-  # Manage admin rights (grant/revoke)
+  # Manage admin rights (grant/revoke) – superuser only
   def update_admin(conn, %{"user_id" => user_id, "action" => action}) do
-    case Repo.get(User, user_id) do
-      nil ->
-        conn
-        |> put_flash(:error, "User not found")
-        |> redirect(to: "/")
-
-      user ->
-        new_role =
-          case action do
-            "grant" -> "admin"
-            "revoke" -> "frontend"
-            _ -> user.role
-          end
-
-        case Accounts.update_user(user, %{"role" => new_role}) do
-          {:ok, _updated} ->
-            conn
-            |> put_flash(:info, "User role updated")
-            |> redirect(to: "/")
-
-          {:error, _changeset} ->
-            conn
-            |> put_flash(:error, "Failed to update role")
-            |> redirect(to: "/")
+    with %User{} = current <- get_current_user(conn),
+         :ok <- authorize_superuser!(current),
+         user <- Repo.get(User, user_id) do
+      new_role =
+        case action do
+          "grant" -> "admin"
+          "revoke" -> "frontend"
+          _ -> user.role
         end
+
+      case Accounts.update_user(user, %{"role" => new_role}) do
+        {:ok, _updated} ->
+          conn
+          |> put_flash(:info, "User role updated")
+          |> redirect(to: "/")
+
+        {:error, _changeset} ->
+          conn
+          |> put_flash(:error, "Failed to update role")
+          |> redirect(to: "/")
+      end
+    else
+      _ ->
+        conn
+        |> put_flash(:error, "Not authorized")
+        |> redirect(to: "/")
     end
   end
 

@@ -1,58 +1,51 @@
 <div style="max-width: 900px; margin: auto; padding: 1.5rem; font-family: sans-serif; line-height: 1.5;">
 
   <style>
-    section {
-      margin-bottom: 2rem;
-    }
+    section { margin-bottom: 2rem; }
     section h1 {
-      font-size: 1.5rem;
-      font-weight: bold;
-      margin-bottom: 0.75rem;
-      border-bottom: 2px solid #ddd;
-      padding-bottom: 0.25rem;
+      font-size: 1.5rem; font-weight: bold;
+      margin-bottom: 0.75rem; border-bottom: 2px solid #ddd; padding-bottom: 0.25rem;
     }
     form {
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      padding: 1rem;
-      margin-top: 0.75rem;
-      background: #fafafa;
+      border: 1px solid #ddd; border-radius: 6px;
+      padding: 1rem; margin-top: 0.75rem; background: #fafafa;
     }
     form h2 {
-      margin-top: 0;
-      margin-bottom: 0.75rem;
-      font-weight: 600;
-      font-size: 1.1rem;
+      margin-top: 0; margin-bottom: 0.75rem;
+      font-weight: 600; font-size: 1.1rem;
     }
     input, select, textarea {
-      display: block;
-      width: 100%;
-      padding: 0.5rem;
-      margin-bottom: 0.75rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+      display: block; width: 100%;
+      padding: 0.5rem; margin-bottom: 0.75rem;
+      border: 1px solid #ccc; border-radius: 4px;
       font-size: 0.95rem;
     }
     button {
-      padding: 0.5rem 1rem;
-      background: #0369a1;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: 600;
+      padding: 0.5rem 1rem; background: #0369a1; color: #fff;
+      border: none; border-radius: 4px; cursor: pointer; font-weight: 600;
     }
-    button:hover {
-      background: #075985;
-    }
-    ul {
-      list-style: disc;
-      margin-left: 1.5rem;
-    }
+    button:hover { background: #075985; }
+    ul { list-style: disc; margin-left: 1.5rem; }
   </style>
 
   <!-- ========================= -->
-  <!-- Registration / Login / Logout -->
+  <!-- Dashboard Header -->
+  <!-- ========================= -->
+  <section id="dashboard">
+    <h1>Email Notification Dashboard</h1>
+    <%= if @current_user do %>
+      <p>
+        Logged in as: <%= @current_user.first_name %> <%= @current_user.last_name %> 
+        (<%= @current_user.username %>)<br/>
+        Role: <%= @current_user.role %> | Plan: <%= @current_user.plan %>
+      </p>
+    <% else %>
+      <p><em>No user logged in.</em></p>
+    <% end %>
+  </section>
+
+  <!-- ========================= -->
+  <!-- User Authentication -->
   <!-- ========================= -->
   <section id="auth">
     <h1>User Authentication</h1>
@@ -89,151 +82,210 @@
   <!-- ========================= -->
   <!-- Frontend User Actions -->
   <!-- ========================= -->
-  <section id="frontend">
-    <h1>Frontend User Actions</h1>
+  <%= if @current_user && @current_user.role == "frontend" do %>
+    <section id="frontend">
+      <h1>Frontend User Actions</h1>
 
-    <!-- Add Contact -->
-    <form method="post" action="/contacts">
-      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-      <h2>Add Contact</h2>
-      <input type="text" name="contact[name]" placeholder="Contact Name" required />
-      <input type="email" name="contact[email]" placeholder="Contact Email" required />
-      <button type="submit">Add Contact</button>
-    </form>
+      <!-- Add Contact -->
+      <form method="post" action="/contacts">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <h2>Add Contact</h2>
+        <input type="text" name="contact[name]" placeholder="Contact Name" required />
+        <input type="email" name="contact[email]" placeholder="Contact Email" required />
+        <button type="submit">Add Contact</button>
+      </form>
 
-    <!-- Send Email to Contact -->
-    <form method="post" action="/emails">
-      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-      <h2>Send Email</h2>
-      <select name="email[contact_id]" required>
-        <option value="">Select Contact</option>
-        <%= for contact <- @contacts do %>
-          <option value={contact.id}><%= contact.name %> (<%= contact.email %>)</option>
-        <% end %>
-      </select>
-      <input type="text" name="email[subject]" placeholder="Subject" required />
-      <textarea name="email[body]" placeholder="Email body" required rows="4"></textarea>
-      <button type="submit">Send Email</button>
-    </form>
+      <!-- Send Email -->
+      <form method="post" action="/emails">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <h2>Send Email</h2>
+        <select name="email[contact_id]" required>
+          <option value="">Select Contact</option>
+          <%= for contact <- @contacts do %>
+            <option value={contact.id}><%= contact.name %> (<%= contact.email %>)</option>
+          <% end %>
+        </select>
+        <input type="text" name="email[subject]" placeholder="Subject" required />
+        <textarea name="email[body]" placeholder="Email body" required rows="4"></textarea>
+        <button type="submit">Send Email</button>
+      </form>
 
-    <!-- Email History -->
-    <div style="margin-top: 1rem;">
-      <h2>Email History</h2>
-      <ul>
-        <%= for email <- @emails do %>
-          <li>
-            <strong>To:</strong>
-            <%= case Enum.find(@contacts, &(&1.id == email.contact_id)) do
-              nil -> "Unknown"
-              c -> c.name
-            end %>
-            | <strong>Subject:</strong> <%= email.subject %>
-            | <strong>Status:</strong> <%= email.status %>
-          </li>
-        <% end %>
-      </ul>
-    </div>
-  </section>
+      <!-- Email History -->
+      <div style="margin-top: 1rem;">
+        <h2>Email History</h2>
+        <ul>
+          <%= for email <- @emails do %>
+            <li>
+              <strong>To:</strong>
+              <%= case Enum.find(@contacts, &(&1.id == email.contact_id)) do
+                nil -> "Unknown"
+                c -> c.name
+              end %>
+              | <strong>Subject:</strong> <%= email.subject %>
+              | <strong>Status:</strong> <%= email.status %>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    </section>
+  <% end %>
+
+  <!-- ========================= -->
+  <!-- Gold Plan Features -->
+  <!-- ========================= -->
+  <%= if @current_user && @current_user.role == "frontend" && @current_user.plan == "gold" do %>
+    <section id="gold-features">
+      <h1>Gold Plan Features</h1>
+
+      <!-- Retry Failed Emails -->
+      <form method="post" action="/emails/retry">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <h2>Retry Failed Emails</h2>
+        <input type="text" name="email_id" placeholder="Email ID" required />
+        <button type="submit">Retry</button>
+      </form>
+
+      <!-- Create Group -->
+      <form method="post" action="/groups">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <h2>Create Group</h2>
+        <input type="text" name="group[name]" placeholder="Group Name" required />
+        <button type="submit">Create Group</button>
+      </form>
+
+      <!-- Add Contact to Group -->
+      <form method="post" action="/group_contacts">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <h2>Add Contact to Group</h2>
+        <select name="group_contact[group_id]" required>
+          <option value="">Select Group</option>
+          <%= for group <- @groups do %>
+            <option value={group.id}><%= group.name %></option>
+          <% end %>
+        </select>
+        <select name="group_contact[contact_id]" required>
+          <option value="">Select Contact</option>
+          <%= for contact <- @contacts do %>
+            <option value={contact.id}><%= contact.name %></option>
+          <% end %>
+        </select>
+        <button type="submit">Add Contact</button>
+      </form>
+
+      <!-- Send Email to Group -->
+      <form method="post" action="/emails/group">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <h2>Send Email to Group</h2>
+        <select name="email[group_id]" required>
+          <option value="">Select Group</option>
+          <%= for group <- @groups do %>
+            <option value={group.id}><%= group.name %></option>
+          <% end %>
+        </select>
+        <input type="text" name="email[subject]" placeholder="Subject" required />
+        <textarea name="email[body]" placeholder="Email body" required rows="4"></textarea>
+        <button type="submit">Send Email</button>
+      </form>
+
+      <!-- Group Email Status -->
+      <div style="margin-top: 1rem;">
+        <h2>Group Email Status</h2>
+        <ul>
+          <%= for group <- @groups do %>
+            <li>
+              <strong><%= group.name %></strong>
+              <% group_emails = Enum.filter(@emails, &(&1.group_id == group.id)) %>
+              <% sent = Enum.count(Enum.filter(group_emails, &(&1.status == "sent"))) %>
+              <% pending = Enum.count(Enum.filter(group_emails, &(&1.status == "pending"))) %>
+              <% failed = Enum.filter(group_emails, &(&1.status == "failed")) %>
+
+              — Sent: <%= sent %>, Pending: <%= pending %>, Failed: <%= length(failed) %>
+
+              <%= if length(failed) > 0 do %>
+                <ul>
+                  <%= for f <- failed do %>
+                    <li>Failed Email ID: <%= f.id %></li>
+                  <% end %>
+                </ul>
+              <% end %>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    </section>
+  <% end %>
 
   <!-- ========================= -->
   <!-- Admin Actions -->
   <!-- ========================= -->
-  <section id="admin">
-    <h1>Admin Actions</h1>
+  <%= if @current_user && @current_user.role == "admin" do %>
+    <section id="admin">
+      <h1>Admin Actions</h1>
 
-    <!-- Users List -->
-    <div>
-      <h2>Users List</h2>
-      <ul>
-        <%= for user <- @users do %>
-          <li>
-            <%= user.first_name %> <%= user.last_name %> (<%= user.email_address %>)
-            - <strong>Role:</strong> <%= user.role %> | <strong>Plan:</strong> <%= user.plan %>
-          </li>
-        <% end %>
-      </ul>
-    </div>
+      <!-- Users List -->
+      <div>
+        <h2>Users List</h2>
+        <ul>
+          <%= for user <- @users do %>
+            <li>
+              <%= user.first_name %> <%= user.last_name %> (<%= user.email_address %>)
+              - <strong>Role:</strong> <%= user.role %> | <strong>Plan:</strong> <%= user.plan %>
+            </li>
+          <% end %>
+        </ul>
+      </div>
 
-    <!-- Delete / Admin / Upgrade Forms -->
-    <form method="post" action="/users/delete">
-      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-      <h2>Delete User</h2>
-      <input type="text" name="user_id" placeholder="User ID to delete" required />
-      <button type="submit">Delete User</button>
-    </form>
+      <!-- Delete User -->
+      <form method="post" action="/users/delete">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <h2>Delete User</h2>
+        <input type="text" name="user_id" placeholder="User ID to delete" required />
+        <button type="submit">Delete User</button>
+      </form>
 
-    <form method="post" action="/users/admin">
-      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-      <h2>Manage Admin Access</h2>
-      <input type="text" name="user_id" placeholder="User ID" required />
-      <select name="action" required>
-        <option value="">Select Action</option>
-        <option value="grant">Grant Admin</option>
-        <option value="revoke">Revoke Admin</option>
-      </select>
-      <button type="submit">Update Access</button>
-    </form>
+      <!-- Manage Admin Access -->
+      <form method="post" action="/users/admin">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <h2>Manage Admin Access</h2>
+        <input type="text" name="user_id" placeholder="User ID" required />
+        <select name="action" required>
+          <option value="">Select Action</option>
+          <option value="grant">Grant Admin</option>
+          <option value="revoke">Revoke Admin</option>
+        </select>
+        <button type="submit">Update Access</button>
+      </form>
 
-    <form method="post" action="/users/upgrade">
-      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-      <h2>Upgrade User to Gold</h2>
-      <input type="text" name="user_id" placeholder="User ID" required />
-      <button type="submit">Upgrade</button>
-    </form>
-  </section>
+      <!-- Upgrade User to Gold -->
+      <form method="post" action="/users/upgrade">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <h2>Upgrade User to Gold</h2>
+        <input type="text" name="user_id" placeholder="User ID" required />
+        <button type="submit">Upgrade</button>
+      </form>
+    </section>
+  <% end %>
 
   <!-- ========================= -->
   <!-- Superuser Actions -->
   <!-- ========================= -->
-  <section id="superuser">
-    <h1>Superuser Actions</h1>
+  <%= if @current_user && @current_user.role == "superuser" do %>
+    <section id="superuser">
+      <h1>Superuser Actions</h1>
+      <p>Superuser has full access.</p>
 
-    <!-- Groups -->
-    <form method="post" action="/groups">
-      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-      <h2>Create Group</h2>
-      <input type="text" name="group[name]" placeholder="Group Name" required />
-      <button type="submit">Create Group</button>
-    </form>
-
-    <form method="post" action="/group_contacts">
-      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-      <h2>Add Contact to Group</h2>
-      <select name="group_contact[group_id]" required>
-        <option value="">Select Group</option>
-        <%= for group <- @groups do %>
-          <option value={group.id}><%= group.name %></option>
-        <% end %>
-      </select>
-      <select name="group_contact[contact_id]" required>
-        <option value="">Select Contact</option>
-        <%= for contact <- @contacts do %>
-          <option value={contact.id}><%= contact.name %></option>
-        <% end %>
-      </select>
-      <button type="submit">Add Contact</button>
-    </form>
-
-    <form method="post" action="/emails/group">
-      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-      <h2>Send Email to Group</h2>
-      <select name="email[group_id]" required>
-        <option value="">Select Group</option>
-        <%= for group <- @groups do %>
-          <option value={group.id}><%= group.name %></option>
-        <% end %>
-      </select>
-      <input type="text" name="email[subject]" placeholder="Subject" required />
-      <textarea name="email[body]" placeholder="Email body" required rows="4"></textarea>
-      <button type="submit">Send Email</button>
-    </form>
-
-    <!-- Retry Failed Emails -->
-    <form method="post" action="/emails/retry">
-      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-      <h2>Retry Failed Emails</h2>
-      <input type="text" name="email_id" placeholder="Email ID" required />
-      <button type="submit">Retry</button>
-    </form>
-  </section>
+      <!-- Manage Superuser Access -->
+      <form method="post" action="/users/superuser">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <h2>Manage Superuser Access</h2>
+        <input type="text" name="user_id" placeholder="User ID" required />
+        <select name="action" required>
+          <option value="">Select Action</option>
+          <option value="grant">Grant Superuser</option>
+          <option value="revoke">Revoke Superuser</option>
+        </select>
+        <button type="submit">Update Superuser Access</button>
+      </form>
+    </section>
+  <% end %>
 </div>

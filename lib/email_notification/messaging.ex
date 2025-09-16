@@ -45,7 +45,16 @@ defmodule EmailNotification.Messaging do
   def list_emails_by_user(user_id), do: Repo.all(from e in Email, where: e.user_id == ^user_id)
 
   def get_email!(id), do: Repo.get!(Email, id)
-  def create_email(attrs), do: %Email{} |> Email.changeset(attrs) |> Repo.insert()
+
+  def create_email(attrs) do
+    # Assign a random status for testing purposes
+    status = Enum.random(["pending", "sent", "failed"])
+
+    %Email{}
+    |> Email.changeset(Map.put(attrs, "status", status))
+    |> Repo.insert()
+  end
+
   def update_email(%Email{} = email, attrs), do: email |> Email.changeset(attrs) |> Repo.update()
   def delete_email(%Email{} = email), do: Repo.delete(email)
   def change_email(%Email{} = email, attrs \\ %{}), do: Email.changeset(email, attrs)
@@ -57,6 +66,7 @@ defmodule EmailNotification.Messaging do
   def retry_email(%Email{status: "failed"} = email) do
     update_email(email, %{status: "pending"})
   end
+
   def retry_email(_), do: {:error, :not_failed}
 
   def send_group_email(group_id, attrs) do
@@ -68,10 +78,14 @@ defmodule EmailNotification.Messaging do
       |> Repo.all()
 
     Enum.map(contacts, fn contact ->
+      # Assign a random status for each group email
+      status = Enum.random(["pending", "sent", "failed"])
+
       %Email{}
       |> Email.changeset(Map.merge(attrs, %{
         "contact_id" => contact.id,
-        "group_id" => group_id
+        "group_id" => group_id,
+        "status" => status
       }))
       |> Repo.insert()
     end)
