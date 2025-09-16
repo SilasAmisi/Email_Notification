@@ -38,6 +38,9 @@
         Logged in as: <%= @current_user.first_name %> <%= @current_user.last_name %> 
         (<%= @current_user.username %>)<br/>
         Role: <%= @current_user.role %> | Plan: <%= @current_user.plan %>
+        <%= if @current_user.superuser do %>
+          | <strong>Superuser</strong>
+        <% end %>
       </p>
     <% else %>
       <p><em>No user logged in.</em></p>
@@ -123,6 +126,12 @@
               end %>
               | <strong>Subject:</strong> <%= email.subject %>
               | <strong>Status:</strong> <%= email.status %>
+
+              <!-- Delete Email -->
+              <form method="post" action={"/emails/#{email.id}/delete"} style="display:inline; margin-left: 1rem;">
+                <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+                <button type="submit" style="background:#dc2626;">Delete</button>
+              </form>
             </li>
           <% end %>
         </ul>
@@ -131,13 +140,67 @@
   <% end %>
 
   <!-- ========================= -->
-  <!-- Gold Plan Features -->
+  <!-- Superuser Dashboard -->
   <!-- ========================= -->
-  <%= if @current_user && @current_user.role == "frontend" && @current_user.plan == "gold" do %>
-    <section id="gold-features">
-      <h1>Gold Plan Features</h1>
+  <%= if @current_user && @current_user.superuser do %>
+    <section id="superuser">
+      <h1>Superuser Dashboard</h1>
+      <p>Superuser has full access (all admin + gold features).</p>
 
-      <!-- Retry Failed Emails -->
+      <!-- ================= Superuser Management ================= -->
+      <form method="post" action="/users/superuser">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <h2>Manage Superuser Access</h2>
+        <input type="text" name="user_id" placeholder="User ID" required />
+        <select name="action" required>
+          <option value="">Select Action</option>
+          <option value="grant">Grant Superuser</option>
+          <option value="revoke">Revoke Superuser</option>
+        </select>
+        <button type="submit">Update Superuser Access</button>
+      </form>
+
+      <form method="post" action="/users/upgrade">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <h2>Upgrade User to Gold</h2>
+        <input type="text" name="user_id" placeholder="User ID" required />
+        <button type="submit">Upgrade</button>
+      </form>
+
+      <!-- ================= Admin Management ================= -->
+      <div>
+        <h2>Users List</h2>
+        <ul>
+          <%= for user <- @users do %>
+            <li>
+              <%= user.first_name %> <%= user.last_name %> (<%= user.email_address %>)
+              - <strong>Role:</strong> <%= user.role %> | <strong>Plan:</strong> <%= user.plan %>
+              <%= if user.superuser do %> | <strong>Superuser</strong> <% end %>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+
+      <form method="post" action="/users/delete">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <h2>Delete User</h2>
+        <input type="text" name="user_id" placeholder="User ID to delete" required />
+        <button type="submit">Delete User</button>
+      </form>
+
+      <form method="post" action="/users/admin">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <h2>Manage Admin Access</h2>
+        <input type="text" name="user_id" placeholder="User ID" required />
+        <select name="action" required>
+          <option value="">Select Action</option>
+          <option value="grant">Grant Admin</option>
+          <option value="revoke">Revoke Admin</option>
+        </select>
+        <button type="submit">Update Access</button>
+      </form>
+
+      <!-- ================= Gold Features ================= -->
       <form method="post" action="/emails/retry">
         <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
         <h2>Retry Failed Emails</h2>
@@ -145,7 +208,6 @@
         <button type="submit">Retry</button>
       </form>
 
-      <!-- Create Group -->
       <form method="post" action="/groups">
         <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
         <h2>Create Group</h2>
@@ -153,7 +215,6 @@
         <button type="submit">Create Group</button>
       </form>
 
-      <!-- Add Contact to Group -->
       <form method="post" action="/group_contacts">
         <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
         <h2>Add Contact to Group</h2>
@@ -172,7 +233,6 @@
         <button type="submit">Add Contact</button>
       </form>
 
-      <!-- Send Email to Group -->
       <form method="post" action="/emails/group">
         <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
         <h2>Send Email to Group</h2>
@@ -187,7 +247,6 @@
         <button type="submit">Send Email</button>
       </form>
 
-      <!-- Group Email Status -->
       <div style="margin-top: 1rem;">
         <h2>Group Email Status</h2>
         <ul>
@@ -212,80 +271,6 @@
           <% end %>
         </ul>
       </div>
-    </section>
-  <% end %>
-
-  <!-- ========================= -->
-  <!-- Admin Actions -->
-  <!-- ========================= -->
-  <%= if @current_user && @current_user.role == "admin" do %>
-    <section id="admin">
-      <h1>Admin Actions</h1>
-
-      <!-- Users List -->
-      <div>
-        <h2>Users List</h2>
-        <ul>
-          <%= for user <- @users do %>
-            <li>
-              <%= user.first_name %> <%= user.last_name %> (<%= user.email_address %>)
-              - <strong>Role:</strong> <%= user.role %> | <strong>Plan:</strong> <%= user.plan %>
-            </li>
-          <% end %>
-        </ul>
-      </div>
-
-      <!-- Delete User -->
-      <form method="post" action="/users/delete">
-        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-        <h2>Delete User</h2>
-        <input type="text" name="user_id" placeholder="User ID to delete" required />
-        <button type="submit">Delete User</button>
-      </form>
-
-      <!-- Manage Admin Access -->
-      <form method="post" action="/users/admin">
-        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-        <h2>Manage Admin Access</h2>
-        <input type="text" name="user_id" placeholder="User ID" required />
-        <select name="action" required>
-          <option value="">Select Action</option>
-          <option value="grant">Grant Admin</option>
-          <option value="revoke">Revoke Admin</option>
-        </select>
-        <button type="submit">Update Access</button>
-      </form>
-
-      <!-- Upgrade User to Gold -->
-      <form method="post" action="/users/upgrade">
-        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-        <h2>Upgrade User to Gold</h2>
-        <input type="text" name="user_id" placeholder="User ID" required />
-        <button type="submit">Upgrade</button>
-      </form>
-    </section>
-  <% end %>
-
-  <!-- ========================= -->
-  <!-- Superuser Actions -->
-  <!-- ========================= -->
-  <%= if @current_user && @current_user.role == "superuser" do %>
-    <section id="superuser">
-      <h1>Superuser Actions</h1>
-      <p>Superuser has full access.</p>
-
-      <!-- Manage Superuser Access -->
-      <form method="post" action="/users/superuser">
-        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-        <h2>Manage Superuser Access</h2>
-        <input type="text" name="user_id" placeholder="User ID" required />
-        <select name="action" required>
-          <option value="">Select Action</option>
-          <option value="grant">Grant Superuser</option>
-          <option value="revoke">Revoke Superuser</option>
-        </select>
-        <button type="submit">Update Superuser Access</button>
-      </form>
     </section>
   <% end %>
 </div>

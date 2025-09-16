@@ -12,7 +12,6 @@ defmodule EmailNotificationWeb.EmailController do
   # HELPERS
   # ==================================================
 
-  # First check session (browser), then header (API)
   defp get_current_user(conn) do
     case get_session(conn, :user_id) do
       nil ->
@@ -94,6 +93,39 @@ defmodule EmailNotificationWeb.EmailController do
     end
   end
 
+  # 🚀 NEW: Delete email from browser (frontend or admin)
+  def delete_browser(conn, %{"id" => id}) do
+    current = get_current_user(conn)
+    email = Messaging.get_email!(id)
+
+    cond do
+      current && current.role == "admin" ->
+        do_delete_browser(conn, email)
+
+      current && email.user_id == current.id ->
+        do_delete_browser(conn, email)
+
+      true ->
+        conn
+        |> put_flash(:error, "Access denied")
+        |> redirect(to: "/")
+    end
+  end
+
+  defp do_delete_browser(conn, email) do
+    case Messaging.delete_email(email) do
+      {:ok, _} ->
+        conn
+        |> put_flash(:info, "Email deleted")
+        |> redirect(to: "/")
+
+      {:error, _reason} ->
+        conn
+        |> put_flash(:error, "Unable to delete email")
+        |> redirect(to: "/")
+    end
+  end
+
   # ==================================================
   # API ENDPOINTS
   # ==================================================
@@ -145,6 +177,7 @@ defmodule EmailNotificationWeb.EmailController do
     end
   end
 
+  # API delete
   def delete(conn, %{"id" => id}) do
     current = get_current_user(conn)
     email = Messaging.get_email!(id)

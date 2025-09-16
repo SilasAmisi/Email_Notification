@@ -26,10 +26,11 @@ defmodule EmailNotificationWeb.Router do
     # Auth (for forms)
     post "/users/register", UserController, :register
     post "/users/login", UserController, :login
-    get  "/users/logout", UserController, :logout   # 👈 Added logout
+    get  "/users/logout", UserController, :logout
     post "/users/delete", UserController, :delete
     post "/users/admin", UserController, :update_admin
     post "/users/upgrade", UserController, :upgrade
+    post "/users/superuser", UserController, :update_superuser   # 👈 NEW
 
     # Contacts
     resources "/contacts", ContactController, only: [:create]
@@ -38,6 +39,7 @@ defmodule EmailNotificationWeb.Router do
     resources "/emails", EmailController, only: [:create]
     post "/emails/group", EmailController, :send_group
     post "/emails/retry", EmailController, :retry_failed_browser
+    post "/emails/:id/delete", EmailController, :delete_browser   # 👈 NEW browser delete
 
     # Groups
     resources "/groups", GroupController, only: [:create]
@@ -55,7 +57,7 @@ defmodule EmailNotificationWeb.Router do
     # Auth (no CSRF here)
     post "/users/register", UserController, :register
     post "/users/login", UserController, :login
-    delete "/users/logout", UserController, :logout  # 👈 Added logout for API
+    delete "/users/logout", UserController, :logout
 
     # Resources
     resources "/users", UserController, except: [:new, :edit]

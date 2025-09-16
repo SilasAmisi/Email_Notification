@@ -21,8 +21,7 @@ defmodule EmailNotificationWeb.UserController do
           _ -> nil
         end
 
-      user_id ->
-        Repo.get(User, user_id)
+      user_id -> Repo.get(User, user_id)
     end
   end
 
@@ -138,7 +137,7 @@ defmodule EmailNotificationWeb.UserController do
     case Repo.insert(changeset) do
       {:ok, user} ->
         conn
-        |> put_session(:user_id, user.id)    # auto-login after register
+        |> put_session(:user_id, user.id)
         |> configure_session(renew: true)
         |> put_status(:created)
         |> put_view(UserJSON)
@@ -156,7 +155,7 @@ defmodule EmailNotificationWeb.UserController do
       user ->
         if user.password == password do
           conn
-          |> put_session(:user_id, user.id)   # persist session
+          |> put_session(:user_id, user.id)
           |> configure_session(renew: true)
           |> json(%{
             message: "Login successful",
@@ -212,26 +211,61 @@ defmodule EmailNotificationWeb.UserController do
     end
   end
 
-  # Upgrade user to gold plan
+  # Manage superuser rights (grant/revoke) – only existing superuser can do this
+  def update_superuser(conn, %{"user_id" => user_id, "action" => action}) do
+    with %User{} = current <- get_current_user(conn),
+         :ok <- authorize_superuser!(current),
+         user <- Repo.get(User, user_id) do
+      new_flag =
+        case action do
+          "grant" -> true
+          "revoke" -> false
+          _ -> user.superuser
+        end
+
+      case Accounts.update_user(user, %{"superuser" => new_flag}) do
+        {:ok, _updated} ->
+          conn
+          |> put_flash(:info, "Superuser flag updated")
+          |> redirect(to: "/")
+
+        {:error, _changeset} ->
+          conn
+          |> put_flash(:error, "Failed to update superuser flag")
+          |> redirect(to: "/")
+      end
+    else
+      _ ->
+        conn
+        |> put_flash(:error, "Not authorized")
+        |> redirect(to: "/")
+    end
+  end
+
+  # Upgrade user to gold plan – superuser only
   def upgrade(conn, %{"user_id" => user_id}) do
-    case Repo.get(User, user_id) do
+    with %User{} = current <- get_current_user(conn),
+         :ok <- authorize_superuser!(current),
+         %User{} = user <- Repo.get(User, user_id),
+         {:ok, _updated} <- Accounts.update_user(user, %{"plan" => "gold"}) do
+      conn
+      |> put_flash(:info, "User upgraded to gold")
+      |> redirect(to: "/")
+    else
       nil ->
         conn
         |> put_flash(:error, "User not found")
         |> redirect(to: "/")
 
-      user ->
-        case Accounts.update_user(user, %{"plan" => "gold"}) do
-          {:ok, _updated} ->
-            conn
-            |> put_flash(:info, "User upgraded to gold")
-            |> redirect(to: "/")
+      {:error, _changeset} ->
+        conn
+        |> put_flash(:error, "Failed to upgrade user")
+        |> redirect(to: "/")
 
-          {:error, _changeset} ->
-            conn
-            |> put_flash(:error, "Failed to upgrade user")
-            |> redirect(to: "/")
-        end
+      _ ->
+        conn
+        |> put_flash(:error, "Not authorized")
+        |> redirect(to: "/")
     end
   end
 
@@ -248,10 +282,9 @@ defmodule EmailNotificationWeb.UserController do
     |> render("show.json", user: user)
   end
 
-  # Normalize keys so both "email" and "email_address" params are accepted
   defp normalize_email_params(params) do
     params
-    |> Map.drop(["email"]) # drop old key if present
+    |> Map.drop(["email"])
     |> Map.put_new("email_address", params["email"] || params["email_address"])
   end
 end
