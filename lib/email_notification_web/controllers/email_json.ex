@@ -2,12 +2,12 @@ defmodule EmailNotificationWeb.EmailJSON do
   alias EmailNotification.Messaging.Email
 
   # For rendering a list of emails
-  def index_json(%{emails: emails}) do
+  def index(%{emails: emails}) do
     %{data: Enum.map(emails, &email_json/1)}
   end
 
   # For rendering a single email
-  def show_json(%{email: email}) do
+  def show(%{email: email}) do
     %{data: email_json(email)}
   end
 
