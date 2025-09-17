@@ -52,6 +52,12 @@ config :tailwind,
     cd: Path.expand("..", __DIR__)
   ]
 
+# Configure Oban (background jobs & queues)
+config :email_notification, Oban,
+  repo: EmailNotification.Repo,
+  plugins: [Oban.Plugins.Pruner],  # cleans up old jobs
+  queues: [default: 10, mailers: 20, priority: 5]
+
 # Configures Elixir's Logger
 config :logger, :default_formatter,
   format: "$time $metadata[$level] $message\n",

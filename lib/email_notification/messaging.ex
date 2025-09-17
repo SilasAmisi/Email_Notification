@@ -1,7 +1,7 @@
 defmodule EmailNotification.Messaging do
   import Ecto.Query, warn: false
   alias EmailNotification.Repo
-  alias EmailNotification.Messaging.{Contact, Group, GroupContact, Email}
+  alias EmailNotification.Messaging.{Contact, Group, GroupContact, Email, EmailWorker}
 
   # --------------------------------------------------
   # Contacts
@@ -47,12 +47,20 @@ defmodule EmailNotification.Messaging do
   def get_email!(id), do: Repo.get!(Email, id)
 
   def create_email(attrs) do
-    # Assign a random status for testing purposes
-    status = Enum.random(["pending", "sent", "failed"])
-
     %Email{}
-    |> Email.changeset(Map.put(attrs, "status", status))
+    |> Email.changeset(Map.put(attrs, "status", "pending"))
     |> Repo.insert()
+    |> case do
+      {:ok, email} ->
+        # enqueue background job
+        %{email_id: email.id}
+        |> EmailWorker.new(priority: 1)
+        |> Oban.insert()
+
+        {:ok, email}
+
+      error -> error
+    end
   end
 
   def update_email(%Email{} = email, attrs), do: email |> Email.changeset(attrs) |> Repo.update()
@@ -65,14 +73,22 @@ defmodule EmailNotification.Messaging do
 
   def retry_email(%Email{status: "failed"} = email) do
     update_email(email, %{status: "pending"})
+    |> case do
+      {:ok, email} ->
+        %{email_id: email.id}
+        |> EmailWorker.new(priority: 0) # higher priority for retries
+        |> Oban.insert()
+
+        {:ok, email}
+
+      error -> error
+    end
   end
 
   def retry_email(_), do: {:error, :not_failed}
 
   @doc """
   Sends an email to every contact in the given group.
-
-  Returns a list of successfully created `%Email{}` structs.
   """
   def send_group_email(group_id, attrs) do
     contacts =
@@ -83,16 +99,20 @@ defmodule EmailNotification.Messaging do
       |> Repo.all()
 
     Enum.reduce(contacts, [], fn contact, acc ->
-      status = Enum.random(["pending", "sent", "failed"])
-
       case %Email{}
            |> Email.changeset(Map.merge(attrs, %{
              "contact_id" => contact.id,
              "group_id" => group_id,
-             "status" => status
+             "status" => "pending"
            }))
            |> Repo.insert() do
-        {:ok, email} -> [email | acc]
+        {:ok, email} ->
+          %{email_id: email.id}
+          |> EmailWorker.new(priority: 2) # group jobs lower priority than retries
+          |> Oban.insert()
+
+          [email | acc]
+
         {:error, _} -> acc
       end
     end)

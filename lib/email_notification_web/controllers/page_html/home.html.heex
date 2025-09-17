@@ -81,7 +81,7 @@
     <button type="submit">Register</button>
   </form>
 
-  <!-- Login (using email instead of username) -->
+  <!-- Login -->
   <form action={~p"/users/login"} method="post">
     <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
     <input type="email" name="email_address" placeholder="Email" required />
@@ -126,7 +126,7 @@
         <%= if email.status == "failed" do %>
           <form action={~p"/emails/retry"} method="post" style="display:inline;">
             <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
-            <input type="hidden" name="id" value={email.id} />
+            <input type="hidden" name="email_id" value={email.id} />
             <button type="submit">Retry</button>
           </form>
         <% end %>
@@ -211,26 +211,46 @@
           <button type="submit">Delete</button>
         </form>
 
-        <!-- Admin actions -->
-        <%= if @current_user && @current_user.role in ["admin", "superuser"] do %>
+        <!-- Admin actions (superuser only) -->
+        <%= if @current_user && @current_user.role == "superuser" do %>
           <form action={~p"/users/admin"} method="post" style="display:inline;">
             <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
             <input type="hidden" name="user_id" value={user.id} />
-            <button type="submit">Toggle Admin</button>
+            <input type="hidden" name="action" value="grant" />
+            <button type="submit">Grant Admin</button>
           </form>
-          <form action={~p"/users/upgrade"} method="post" style="display:inline;">
+          <form action={~p"/users/admin"} method="post" style="display:inline;">
             <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
             <input type="hidden" name="user_id" value={user.id} />
-            <button type="submit">Upgrade Plan</button>
+            <input type="hidden" name="action" value="revoke" />
+            <button type="submit" class="danger">Revoke Admin</button>
           </form>
         <% end %>
 
-        <!-- Superuser actions -->
+        <!-- Plan upgrade/downgrade (superuser only) -->
+        <%= if @current_user && @current_user.role == "superuser" do %>
+          <form action={~p"/users/upgrade"} method="post" style="display:inline;">
+            <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+            <input type="hidden" name="user_id" value={user.id} />
+            <button type="submit">
+              <%= if user.plan == "gold", do: "Downgrade to Standard", else: "Upgrade to Gold" %>
+            </button>
+          </form>
+        <% end %>
+
+        <!-- Superuser actions (superuser only) -->
         <%= if @current_user && @current_user.role == "superuser" do %>
           <form action={~p"/users/superuser"} method="post" style="display:inline;">
             <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
             <input type="hidden" name="user_id" value={user.id} />
-            <button type="submit">Toggle Superuser</button>
+            <input type="hidden" name="action" value="grant" />
+            <button type="submit">Grant Superuser</button>
+          </form>
+          <form action={~p"/users/superuser"} method="post" style="display:inline;">
+            <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+            <input type="hidden" name="user_id" value={user.id} />
+            <input type="hidden" name="action" value="revoke" />
+            <button type="submit" class="danger">Revoke Superuser</button>
           </form>
         <% end %>
       </li>

@@ -30,3 +30,30 @@ defmodule EmailNotification.Messaging.Email do
     end
   end
 end
+
+# 🔹 Embedded Oban Worker for handling email delivery
+defmodule EmailNotification.Messaging.EmailWorker do
+  use Oban.Worker,
+    queue: :emails,
+    priority: 1,
+    max_attempts: 5
+
+  alias EmailNotification.Messaging
+  alias EmailNotification.Messaging.Email
+  alias EmailNotification.Repo
+
+  @impl Oban.Worker
+  def perform(%Oban.Job{args: %{"email_id" => email_id}}) do
+    case Repo.get(Email, email_id) do
+      nil ->
+        {:error, :not_found}
+
+      email ->
+        # MVP: simulate sending
+        IO.puts("📨 Sending email #{email.id} to contact_id #{inspect(email.contact_id)}")
+
+        Messaging.update_email(email, %{"status" => "sent"})
+        :ok
+    end
+  end
+end
