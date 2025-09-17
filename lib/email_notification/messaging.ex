@@ -69,6 +69,11 @@ defmodule EmailNotification.Messaging do
 
   def retry_email(_), do: {:error, :not_failed}
 
+  @doc """
+  Sends an email to every contact in the given group.
+
+  Returns a list of successfully created `%Email{}` structs.
+  """
   def send_group_email(group_id, attrs) do
     contacts =
       GroupContact
@@ -77,20 +82,26 @@ defmodule EmailNotification.Messaging do
       |> select([_gc, c], c)
       |> Repo.all()
 
-    Enum.map(contacts, fn contact ->
-      # Assign a random status for each group email
+    Enum.reduce(contacts, [], fn contact, acc ->
       status = Enum.random(["pending", "sent", "failed"])
 
-      %Email{}
-      |> Email.changeset(Map.merge(attrs, %{
-        "contact_id" => contact.id,
-        "group_id" => group_id,
-        "status" => status
-      }))
-      |> Repo.insert()
+      case %Email{}
+           |> Email.changeset(Map.merge(attrs, %{
+             "contact_id" => contact.id,
+             "group_id" => group_id,
+             "status" => status
+           }))
+           |> Repo.insert() do
+        {:ok, email} -> [email | acc]
+        {:error, _} -> acc
+      end
     end)
+    |> Enum.reverse()
   end
 
+  @doc """
+  Returns a summary of group email statuses.
+  """
   def group_email_status(group_id) do
     query =
       from e in Email,

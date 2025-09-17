@@ -25,8 +25,10 @@ defmodule EmailNotificationWeb.EmailController do
     end
   end
 
-  defp authorize_superuser!(%User{role: "admin", plan: "gold"}), do: :ok
-  defp authorize_superuser!(_), do: {:error, :forbidden}
+  # Allow superusers or gold admins
+  defp authorize_email_admin!(%User{role: "superuser"}), do: :ok
+  defp authorize_email_admin!(%User{role: "admin", plan: "gold"}), do: :ok
+  defp authorize_email_admin!(_), do: {:error, :forbidden}
 
   # ==================================================
   # BROWSER ACTIONS (home.html.heex)
@@ -56,7 +58,17 @@ defmodule EmailNotificationWeb.EmailController do
     end
   end
 
+  # Handles form posting { "email" => %{ "group_id" => ... } }
   def send_group(conn, %{"email" => %{"group_id" => group_id} = email_params}) do
+    do_send_group(conn, group_id, email_params)
+  end
+
+  # Handles form posting { "group_id" => ... }
+  def send_group(conn, %{"group_id" => group_id}) do
+    do_send_group(conn, group_id, %{})
+  end
+
+  defp do_send_group(conn, group_id, email_params) do
     current = get_current_user(conn)
 
     cond do
@@ -80,31 +92,34 @@ defmodule EmailNotificationWeb.EmailController do
   end
 
   def retry_failed_browser(conn, %{"email_id" => id}) do
+    current = get_current_user(conn)
     email = Messaging.get_email!(id)
 
-    case Messaging.retry_email(email) do
-      {:ok, _email} ->
-        redirect(conn, to: "/")
+    with :ok <- authorize_email_admin!(current) do
+      case Messaging.retry_email(email) do
+        {:ok, _email} -> redirect(conn, to: "/")
 
-      {:error, reason} ->
+        {:error, reason} ->
+          conn
+          |> put_flash(:error, "Unable to retry email: #{reason}")
+          |> redirect(to: "/")
+      end
+    else
+      _ ->
         conn
-        |> put_flash(:error, "Unable to retry email: #{reason}")
+        |> put_flash(:error, "Access denied")
         |> redirect(to: "/")
     end
   end
 
-  # 🚀 NEW: Delete email from browser (frontend or admin)
+  # 🚀 Delete email from browser (frontend or admin)
   def delete_browser(conn, %{"id" => id}) do
     current = get_current_user(conn)
     email = Messaging.get_email!(id)
 
     cond do
-      current && current.role == "admin" ->
-        do_delete_browser(conn, email)
-
-      current && email.user_id == current.id ->
-        do_delete_browser(conn, email)
-
+      current && current.role == "admin" -> do_delete_browser(conn, email)
+      current && email.user_id == current.id -> do_delete_browser(conn, email)
       true ->
         conn
         |> put_flash(:error, "Access denied")
@@ -135,9 +150,15 @@ defmodule EmailNotificationWeb.EmailController do
 
     emails =
       cond do
-        current && current.role == "admin" -> Messaging.list_emails()
-        current -> Messaging.list_emails() |> Enum.filter(&(&1.user_id == current.id))
-        true -> []
+        current && current.role == "admin" ->
+          Messaging.list_emails()
+
+        current ->
+          Messaging.list_emails()
+          |> Enum.filter(&(&1.user_id == current.id))
+
+        true ->
+          []
       end
 
     conn
@@ -170,10 +191,13 @@ defmodule EmailNotificationWeb.EmailController do
   defp do_update(conn, email, email_params) do
     case Messaging.update_email(email, email_params) do
       {:ok, email} -> render_email(conn, email)
+
       {:error, changeset} ->
         conn
         |> put_status(:unprocessable_entity)
-        |> json(%{errors: Ecto.Changeset.traverse_errors(changeset, &translate_error/1)})
+        |> json(%{
+          errors: Ecto.Changeset.traverse_errors(changeset, &translate_error/1)
+        })
     end
   end
 
@@ -192,6 +216,7 @@ defmodule EmailNotificationWeb.EmailController do
   defp do_delete(conn, email) do
     case Messaging.delete_email(email) do
       {:ok, _} -> send_resp(conn, :no_content, "")
+
       {:error, _reason} ->
         conn
         |> put_status(:unprocessable_entity)
@@ -207,9 +232,10 @@ defmodule EmailNotificationWeb.EmailController do
     current = get_current_user(conn)
     email = Messaging.get_email!(id)
 
-    with :ok <- authorize_superuser!(current) do
+    with :ok <- authorize_email_admin!(current) do
       case Messaging.retry_email(email) do
         {:ok, email} -> render_email(conn, email)
+
         {:error, reason} ->
           conn
           |> put_status(:unprocessable_entity)
@@ -223,6 +249,7 @@ defmodule EmailNotificationWeb.EmailController do
   # ==================================================
   # HELPERS
   # ==================================================
+
   defp render_email(conn, email) do
     conn
     |> put_view(EmailJSON)

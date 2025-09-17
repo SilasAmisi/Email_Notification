@@ -22,13 +22,23 @@ defmodule EmailNotificationWeb.GroupController do
           _ -> nil
         end
 
-      user_id ->
-        Repo.get(User, user_id)
+      user_id -> Repo.get(User, user_id)
     end
   end
 
-  defp authorize_superuser!(%User{role: "admin", plan: "gold"}), do: :ok
-  defp authorize_superuser!(_), do: {:error, :forbidden}
+  # Allow only gold admins or superusers
+  defp authorize_group_admin!(%User{role: "superuser"}), do: :ok
+  defp authorize_group_admin!(%User{role: "admin", plan: "gold"}), do: :ok
+  defp authorize_group_admin!(_), do: {:error, :forbidden}
+
+  # Convert changeset errors into a JSON-safe map
+  defp format_errors(changeset) do
+    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+      Enum.reduce(opts, msg, fn {key, value}, acc ->
+        String.replace(acc, "%{#{key}}", to_string(value))
+      end)
+    end)
+  end
 
   # ==================================================
   # CRUD ACTIONS
@@ -40,8 +50,9 @@ defmodule EmailNotificationWeb.GroupController do
     groups =
       cond do
         current == nil -> []
+        current.role == "superuser" -> Messaging.list_groups()
         current.role == "admin" && current.plan == "gold" -> Messaging.list_groups()
-        true -> [] # MVP: regular users don’t see groups
+        true -> []
       end
 
     conn
@@ -53,7 +64,7 @@ defmodule EmailNotificationWeb.GroupController do
     current = get_current_user(conn)
     group = Messaging.get_group!(id)
 
-    if current && current.role == "admin" && current.plan == "gold" do
+    if current && (current.role == "superuser" || (current.role == "admin" && current.plan == "gold")) do
       conn
       |> put_view(GroupJSON)
       |> render("show.json", group: group)
@@ -64,16 +75,19 @@ defmodule EmailNotificationWeb.GroupController do
 
   def create(conn, %{"group" => group_params}) do
     with %User{} = current <- get_current_user(conn),
-         :ok <- authorize_superuser!(current),
-         {:ok, %Group{} = group} <- Messaging.create_group(group_params) do
+         :ok <- authorize_group_admin!(current),
+         # attach current user_id to the group
+         {:ok, %Group{} = group} <- Messaging.create_group(Map.put(group_params, "user_id", current.id)) do
       conn
       |> put_status(:created)
       |> put_resp_header("location", ~p"/api/groups/#{group.id}")
       |> put_view(GroupJSON)
       |> render("show.json", group: group)
     else
-      {:error, changeset} ->
-        conn |> put_status(:unprocessable_entity) |> json(%{errors: changeset})
+      {:error, %Ecto.Changeset{} = changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{errors: format_errors(changeset)})
 
       _ ->
         send_resp(conn, :forbidden, "Access denied")
@@ -82,15 +96,17 @@ defmodule EmailNotificationWeb.GroupController do
 
   def update(conn, %{"id" => id, "group" => group_params}) do
     with %User{} = current <- get_current_user(conn),
-         :ok <- authorize_superuser!(current),
+         :ok <- authorize_group_admin!(current),
          group <- Messaging.get_group!(id),
          {:ok, %Group{} = updated_group} <- Messaging.update_group(group, group_params) do
       conn
       |> put_view(GroupJSON)
       |> render("show.json", group: updated_group)
     else
-      {:error, changeset} ->
-        conn |> put_status(:unprocessable_entity) |> json(%{errors: changeset})
+      {:error, %Ecto.Changeset{} = changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{errors: format_errors(changeset)})
 
       _ ->
         send_resp(conn, :forbidden, "Access denied")
@@ -99,7 +115,7 @@ defmodule EmailNotificationWeb.GroupController do
 
   def delete(conn, %{"id" => id}) do
     with %User{} = current <- get_current_user(conn),
-         :ok <- authorize_superuser!(current),
+         :ok <- authorize_group_admin!(current),
          group <- Messaging.get_group!(id),
          {:ok, _} <- Messaging.delete_group(group) do
       send_resp(conn, :no_content, "")
@@ -109,12 +125,12 @@ defmodule EmailNotificationWeb.GroupController do
   end
 
   # ==================================================
-  # GROUP EMAILS (SUPERUSERS ONLY)
+  # GROUP EMAILS (SUPERUSERS OR GOLD ADMINS ONLY)
   # ==================================================
 
   def send_emails(conn, %{"id" => group_id, "subject" => subject, "body" => body}) do
     with %User{} = current <- get_current_user(conn),
-         :ok <- authorize_superuser!(current) do
+         :ok <- authorize_group_admin!(current) do
       results = Messaging.send_group_email(group_id, %{"subject" => subject, "body" => body})
 
       conn
@@ -127,7 +143,7 @@ defmodule EmailNotificationWeb.GroupController do
 
   def email_status(conn, %{"id" => group_id}) do
     with %User{} = current <- get_current_user(conn),
-         :ok <- authorize_superuser!(current) do
+         :ok <- authorize_group_admin!(current) do
       stats = Messaging.group_email_status(group_id)
 
       conn

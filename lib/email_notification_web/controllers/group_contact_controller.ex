@@ -22,13 +22,14 @@ defmodule EmailNotificationWeb.GroupContactController do
           _ -> nil
         end
 
-      user_id ->
-        Repo.get(User, user_id)
+      user_id -> Repo.get(User, user_id)
     end
   end
 
-  defp authorize_superuser!(%User{role: "admin", plan: "gold"}), do: :ok
-  defp authorize_superuser!(_), do: {:error, :forbidden}
+  # Allow only superuser or gold admin
+  defp authorize_group_admin!(%User{role: "superuser"}), do: :ok
+  defp authorize_group_admin!(%User{role: "admin", plan: "gold"}), do: :ok
+  defp authorize_group_admin!(_), do: {:error, :forbidden}
 
   # ==================================================
   # ACTIONS
@@ -38,7 +39,7 @@ defmodule EmailNotificationWeb.GroupContactController do
     current = get_current_user(conn)
 
     group_contacts =
-      if current && current.role == "admin" && current.plan == "gold" do
+      if current && (current.role == "superuser" || (current.role == "admin" && current.plan == "gold")) do
         Messaging.list_group_contacts()
       else
         []
@@ -53,7 +54,7 @@ defmodule EmailNotificationWeb.GroupContactController do
     current = get_current_user(conn)
     group_contact = Messaging.get_group_contact!(id)
 
-    if current && current.role == "admin" && current.plan == "gold" do
+    if current && (current.role == "superuser" || (current.role == "admin" && current.plan == "gold")) do
       conn
       |> put_view(GroupContactJSON)
       |> render("show.json", group_contact: group_contact)
@@ -64,7 +65,7 @@ defmodule EmailNotificationWeb.GroupContactController do
 
   def create(conn, %{"group_contact" => gc_params}) do
     with %User{} = current <- get_current_user(conn),
-         :ok <- authorize_superuser!(current),
+         :ok <- authorize_group_admin!(current),
          {:ok, %GroupContact{} = group_contact} <- Messaging.create_group_contact(gc_params) do
       conn
       |> put_status(:created)
@@ -82,7 +83,7 @@ defmodule EmailNotificationWeb.GroupContactController do
 
   def update(conn, %{"id" => id, "group_contact" => gc_params}) do
     with %User{} = current <- get_current_user(conn),
-         :ok <- authorize_superuser!(current),
+         :ok <- authorize_group_admin!(current),
          group_contact <- Messaging.get_group_contact!(id),
          {:ok, %GroupContact{} = updated_gc} <- Messaging.update_group_contact(group_contact, gc_params) do
       conn
@@ -99,7 +100,7 @@ defmodule EmailNotificationWeb.GroupContactController do
 
   def delete(conn, %{"id" => id}) do
     with %User{} = current <- get_current_user(conn),
-         :ok <- authorize_superuser!(current),
+         :ok <- authorize_group_admin!(current),
          group_contact <- Messaging.get_group_contact!(id),
          {:ok, _} <- Messaging.delete_group_contact(group_contact) do
       send_resp(conn, :no_content, "")

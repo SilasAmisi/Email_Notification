@@ -16,6 +16,6 @@ defmodule EmailNotification.Messaging.Contact do
     contact
     |> cast(attrs, [:name, :email, :user_id])
     |> validate_required([:name, :email])
-    |> unique_constraint(:email)
+    |> validate_format(:email, ~r/@/)
   end
 end

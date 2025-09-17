@@ -7,9 +7,8 @@ defmodule EmailNotification.Accounts.User do
     field :last_name, :string
     field :email_address, :string
     field :msisdn, :string
-    field :role, :string, default: "frontend"   # frontend, admin
-    field :plan, :string, default: "standard"   # standard, gold
-    field :superuser, :boolean, default: false  # ✅ new field
+    field :role, :string, default: "frontend"   # frontend | admin | superuser
+    field :plan, :string, default: "standard"   # standard | gold
     field :username, :string
     field :password, :string   # ⚠️ stored as plain text (not secure)
 
@@ -18,7 +17,7 @@ defmodule EmailNotification.Accounts.User do
 
   @doc """
   Generic changeset (used for updates & admin create).
-  Allows setting role/plan/superuser explicitly.
+  Allows setting role/plan explicitly.
   """
   def changeset(user, attrs) do
     user
@@ -29,19 +28,18 @@ defmodule EmailNotification.Accounts.User do
       :msisdn,
       :role,
       :plan,
-      :superuser,   # ✅ allow explicit superuser setting
       :username,
       :password
     ])
     |> validate_required([:first_name, :last_name, :email_address, :username, :password])
-    |> validate_format(:email_address, ~r/@/)  # ensure it's a valid email format
+    |> validate_format(:email_address, ~r/@/)  # ensure valid email
     |> unique_constraint(:email_address)
     |> unique_constraint(:username)
   end
 
   @doc """
   Registration changeset (used for self-service signup).
-  Does NOT allow overriding role/plan/superuser – they stay defaults.
+  New users always default to role = "frontend" and plan = "standard".
   """
   def registration_changeset(user, attrs) do
     user

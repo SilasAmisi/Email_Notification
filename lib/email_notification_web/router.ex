@@ -23,14 +23,16 @@ defmodule EmailNotificationWeb.Router do
     # Dashboard
     get "/", PageController, :home
 
-    # Auth (for forms)
+    # Auth (forms-based)
     post "/users/register", UserController, :register
     post "/users/login", UserController, :login
     get  "/users/logout", UserController, :logout
+
+    # User management (role-based)
     post "/users/delete", UserController, :delete
     post "/users/admin", UserController, :update_admin
     post "/users/upgrade", UserController, :upgrade
-    post "/users/superuser", UserController, :update_superuser   # 👈 NEW
+    post "/users/superuser", UserController, :update_superuser   # ✅ uses role == "superuser"
 
     # Contacts
     resources "/contacts", ContactController, only: [:create]
@@ -39,7 +41,7 @@ defmodule EmailNotificationWeb.Router do
     resources "/emails", EmailController, only: [:create]
     post "/emails/group", EmailController, :send_group
     post "/emails/retry", EmailController, :retry_failed_browser
-    post "/emails/:id/delete", EmailController, :delete_browser   # 👈 NEW browser delete
+    post "/emails/:id/delete", EmailController, :delete_browser   # ✅ browser delete route
 
     # Groups
     resources "/groups", GroupController, only: [:create]
@@ -54,7 +56,7 @@ defmodule EmailNotificationWeb.Router do
   scope "/api", EmailNotificationWeb do
     pipe_through :api
 
-    # Auth (no CSRF here)
+    # Auth (stateless API, no CSRF)
     post "/users/register", UserController, :register
     post "/users/login", UserController, :login
     delete "/users/logout", UserController, :logout
@@ -69,7 +71,7 @@ defmodule EmailNotificationWeb.Router do
     # Extra actions
     post "/emails/:id/retry", EmailController, :retry_failed_api
     post "/groups/:id/send_emails", GroupController, :send_emails
-    get "/groups/:id/email_status", GroupController, :email_status
+    get  "/groups/:id/email_status", GroupController, :email_status
   end
 
   # -------------------------------

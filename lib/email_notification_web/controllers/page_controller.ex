@@ -28,14 +28,36 @@ defmodule EmailNotificationWeb.PageController do
   def home(conn, _params) do
     current_user = get_current_user(conn)
 
-    IO.inspect(current_user, label: "💡 Logged-in user")
-    IO.inspect(current_user && current_user.role, label: "💡 Logged-in user role")
+    {users, contacts, groups, emails} =
+      case current_user do
+        %User{role: "superuser"} ->
+          {Accounts.list_users(), Messaging.list_contacts(), Messaging.list_groups(), Messaging.list_emails()}
+
+        %User{role: "admin"} ->
+          {Accounts.list_users(), Messaging.list_contacts(), Messaging.list_groups(), Messaging.list_emails()}
+
+        %User{id: id} ->
+          {
+            [], # frontend users don’t see all users
+            Messaging.list_contacts() |> Enum.filter(&(&1.user_id == id)),
+            [], # frontend users don’t see all groups
+            Messaging.list_emails() |> Enum.filter(&(&1.user_id == id))
+          }
+
+        _ ->
+          {[], [], [], []}
+      end
+
+    if Mix.env() == :dev do
+      IO.inspect(current_user, label: "💡 Logged-in user")
+      IO.inspect(current_user && current_user.role, label: "💡 Logged-in user role")
+    end
 
     render(conn, "home.html",
-      users: Accounts.list_users(),
-      contacts: Messaging.list_contacts(),
-      groups: Messaging.list_groups(),
-      emails: Messaging.list_emails(),
+      users: users,
+      contacts: contacts,
+      groups: groups,
+      emails: emails,
       current_user: current_user
     )
   end

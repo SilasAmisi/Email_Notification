@@ -1,276 +1,239 @@
-<div style="max-width: 900px; margin: auto; padding: 1.5rem; font-family: sans-serif; line-height: 1.5;">
+<!-- lib/email_notification_web/controllers/page_html/home.html.heex -->
 
-  <style>
-    section { margin-bottom: 2rem; }
-    section h1 {
-      font-size: 1.5rem; font-weight: bold;
-      margin-bottom: 0.75rem; border-bottom: 2px solid #ddd; padding-bottom: 0.25rem;
-    }
-    form {
-      border: 1px solid #ddd; border-radius: 6px;
-      padding: 1rem; margin-top: 0.75rem; background: #fafafa;
-    }
-    form h2 {
-      margin-top: 0; margin-bottom: 0.75rem;
-      font-weight: 600; font-size: 1.1rem;
-    }
-    input, select, textarea {
-      display: block; width: 100%;
-      padding: 0.5rem; margin-bottom: 0.75rem;
-      border: 1px solid #ccc; border-radius: 4px;
-      font-size: 0.95rem;
-    }
-    button {
-      padding: 0.5rem 1rem; background: #0369a1; color: #fff;
-      border: none; border-radius: 4px; cursor: pointer; font-weight: 600;
-    }
-    button:hover { background: #075985; }
-    ul { list-style: disc; margin-left: 1.5rem; }
-  </style>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background: #f7f9fc;
+    color: #333;
+  }
+  h1, h2 {
+    color: #2c3e50;
+    border-bottom: 2px solid #ccc;
+    padding-bottom: 5px;
+  }
+  ul {
+    list-style: none;
+    padding: 0;
+  }
+  li {
+    padding: 6px 0;
+    border-bottom: 1px solid #eee;
+  }
+  form {
+    margin: 10px 0;
+    padding: 10px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    display: inline-block;
+  }
+  input, select, textarea, button {
+    margin: 5px;
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  button {
+    background: #3498db;
+    color: white;
+    cursor: pointer;
+    border: none;
+  }
+  button:hover {
+    background: #2980b9;
+  }
+  .danger button {
+    background: #e74c3c;
+  }
+  .danger button:hover {
+    background: #c0392b;
+  }
+  .section {
+    margin-bottom: 30px;
+    padding: 15px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+</style>
 
-  <!-- ========================= -->
-  <!-- Dashboard Header -->
-  <!-- ========================= -->
-  <section id="dashboard">
-    <h1>Email Notification Dashboard</h1>
-    <%= if @current_user do %>
-      <p>
-        Logged in as: <%= @current_user.first_name %> <%= @current_user.last_name %> 
-        (<%= @current_user.username %>)<br/>
-        Role: <%= @current_user.role %> | Plan: <%= @current_user.plan %>
-        <%= if @current_user.superuser do %>
-          | <strong>Superuser</strong>
-        <% end %>
-      </p>
-    <% else %>
-      <p><em>No user logged in.</em></p>
+<h1>Dashboard</h1>
+
+<%= if @current_user do %>
+  <p>Welcome, <%= @current_user.first_name %> (<%= @current_user.role %>)</p>
+<% else %>
+  <p>Welcome, guest! Please log in or register.</p>
+<% end %>
+
+<!-- ========== Auth Section ========== -->
+<div class="section">
+  <h2>Authentication</h2>
+
+  <!-- Register -->
+  <form action={~p"/users/register"} method="post">
+    <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+    <input type="text" name="user[first_name]" placeholder="First Name" required />
+    <input type="text" name="user[last_name]" placeholder="Last Name" required />
+    <input type="text" name="user[username]" placeholder="Username" required />
+    <input type="email" name="user[email_address]" placeholder="Email" required />
+    <input type="password" name="user[password]" placeholder="Password" required />
+    <button type="submit">Register</button>
+  </form>
+
+  <!-- Login (using email instead of username) -->
+  <form action={~p"/users/login"} method="post">
+    <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+    <input type="email" name="email_address" placeholder="Email" required />
+    <input type="password" name="password" placeholder="Password" required />
+    <button type="submit">Login</button>
+  </form>
+
+  <!-- Logout -->
+  <form action={~p"/users/logout"} method="get">
+    <button type="submit">Logout</button>
+  </form>
+</div>
+
+<!-- ========== Contacts Section ========== -->
+<div class="section">
+  <h2>Contacts</h2>
+  <ul>
+    <%= for contact <- @contacts || [] do %>
+      <li><%= contact.name %> - <%= contact.email %></li>
     <% end %>
-  </section>
+  </ul>
 
-  <!-- ========================= -->
-  <!-- User Authentication -->
-  <!-- ========================= -->
-  <section id="auth">
-    <h1>User Authentication</h1>
+  <form action={~p"/contacts"} method="post">
+    <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+    <input type="text" name="contact[name]" placeholder="Name" required />
+    <input type="email" name="contact[email]" placeholder="Email" required />
+    <button type="submit">Add Contact</button>
+  </form>
+</div>
 
-    <!-- Registration -->
-    <form method="post" action="/users/register">
-      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-      <h2>Register</h2>
-      <input type="text" name="user[first_name]" placeholder="First Name" required />
-      <input type="text" name="user[last_name]" placeholder="Last Name" required />
-      <input type="email" name="user[email_address]" placeholder="Email" required />
-      <input type="text" name="user[msisdn]" placeholder="Phone (msisdn)" />
-      <input type="text" name="user[username]" placeholder="Username" required />
-      <input type="password" name="user[password]" placeholder="Password" required />
-      <button type="submit">Register</button>
-    </form>
+<!-- ========== Emails Section ========== -->
+<div class="section">
+  <h2>Emails</h2>
+  <ul>
+    <%= for email <- @emails || [] do %>
+      <li>
+        <b><%= email.subject %></b> - <%= email.status %>
+        <form action={~p"/emails/#{email.id}/delete"} method="post" class="danger" style="display:inline;">
+          <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+          <button type="submit">Delete</button>
+        </form>
+        <%= if email.status == "failed" do %>
+          <form action={~p"/emails/retry"} method="post" style="display:inline;">
+            <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+            <input type="hidden" name="id" value={email.id} />
+            <button type="submit">Retry</button>
+          </form>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
 
-    <!-- Login -->
-    <form method="post" action="/users/login">
-      <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-      <h2>Login</h2>
-      <input type="email" name="email_address" placeholder="Email" required />
-      <input type="password" name="password" placeholder="Password" required />
-      <button type="submit">Login</button>
-    </form>
+  <!-- Send Single Email -->
+  <form action={~p"/emails"} method="post">
+    <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+    <input type="text" name="email[subject]" placeholder="Subject" required />
+    <textarea name="email[body]" placeholder="Body" required></textarea>
+    <select name="email[contact_id]">
+      <%= for contact <- @contacts || [] do %>
+        <option value={contact.id}><%= contact.name %></option>
+      <% end %>
+    </select>
+    <button type="submit">Send Email</button>
+  </form>
 
-    <!-- Logout -->
-    <form method="get" action="/users/logout" style="margin-top: 1rem;">
-      <h2>Logout</h2>
-      <button type="submit">Logout</button>
-    </form>
-  </section>
+  <!-- Send Group Email -->
+  <form action={~p"/emails/group"} method="post">
+    <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+    <input type="text" name="email[subject]" placeholder="Subject" required />
+    <textarea name="email[body]" placeholder="Body" required></textarea>
+    <select name="email[group_id]" required>
+      <%= for group <- @groups || [] do %>
+        <option value={group.id}><%= group.name %></option>
+      <% end %>
+    </select>
+    <button type="submit">Send Group Email</button>
+  </form>
+</div>
 
-  <!-- ========================= -->
-  <!-- Frontend User Actions -->
-  <!-- ========================= -->
-  <%= if @current_user && @current_user.role == "frontend" do %>
-    <section id="frontend">
-      <h1>Frontend User Actions</h1>
+<!-- ========== Groups Section ========== -->
+<div class="section">
+  <h2>Groups</h2>
+  <ul>
+    <%= for group <- @groups || [] do %>
+      <li><%= group.name %></li>
+    <% end %>
+  </ul>
 
-      <!-- Add Contact -->
-      <form method="post" action="/contacts">
-        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-        <h2>Add Contact</h2>
-        <input type="text" name="contact[name]" placeholder="Contact Name" required />
-        <input type="email" name="contact[email]" placeholder="Contact Email" required />
-        <button type="submit">Add Contact</button>
-      </form>
+  <form action={~p"/groups"} method="post">
+    <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+    <input type="text" name="group[name]" placeholder="Group Name" required />
+    <button type="submit">Create Group</button>
+  </form>
+</div>
 
-      <!-- Send Email -->
-      <form method="post" action="/emails">
-        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-        <h2>Send Email</h2>
-        <select name="email[contact_id]" required>
-          <option value="">Select Contact</option>
-          <%= for contact <- @contacts do %>
-            <option value={contact.id}><%= contact.name %> (<%= contact.email %>)</option>
-          <% end %>
-        </select>
-        <input type="text" name="email[subject]" placeholder="Subject" required />
-        <textarea name="email[body]" placeholder="Email body" required rows="4"></textarea>
-        <button type="submit">Send Email</button>
-      </form>
+<!-- ========== Group-Contacts Section ========== -->
+<div class="section">
+  <h2>Assign Contact to Group</h2>
+  <form action={~p"/group_contacts"} method="post">
+    <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+    <select name="group_contact[group_id]">
+      <%= for group <- @groups || [] do %>
+        <option value={group.id}><%= group.name %></option>
+      <% end %>
+    </select>
+    <select name="group_contact[contact_id]">
+      <%= for contact <- @contacts || [] do %>
+        <option value={contact.id}><%= contact.name %></option>
+      <% end %>
+    </select>
+    <button type="submit">Add to Group</button>
+  </form>
+</div>
 
-      <!-- Email History -->
-      <div style="margin-top: 1rem;">
-        <h2>Email History</h2>
-        <ul>
-          <%= for email <- @emails do %>
-            <li>
-              <strong>To:</strong>
-              <%= case Enum.find(@contacts, &(&1.id == email.contact_id)) do
-                nil -> "Unknown"
-                c -> c.name
-              end %>
-              | <strong>Subject:</strong> <%= email.subject %>
-              | <strong>Status:</strong> <%= email.status %>
+<!-- ========== Users Section ========== -->
+<div class="section">
+  <h2>Users</h2>
+  <ul>
+    <%= for user <- @users || [] do %>
+      <li>
+        <%= user.username %> - <%= user.role %> - <%= user.plan %>
 
-              <!-- Delete Email -->
-              <form method="post" action={"/emails/#{email.id}/delete"} style="display:inline; margin-left: 1rem;">
-                <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-                <button type="submit" style="background:#dc2626;">Delete</button>
-              </form>
-            </li>
-          <% end %>
-        </ul>
-      </div>
-    </section>
-  <% end %>
+        <!-- Delete -->
+        <form action={~p"/users/delete"} method="post" class="danger" style="display:inline;">
+          <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+          <input type="hidden" name="user_id" value={user.id} />
+          <button type="submit">Delete</button>
+        </form>
 
-  <!-- ========================= -->
-  <!-- Superuser Dashboard -->
-  <!-- ========================= -->
-  <%= if @current_user && @current_user.superuser do %>
-    <section id="superuser">
-      <h1>Superuser Dashboard</h1>
-      <p>Superuser has full access (all admin + gold features).</p>
+        <!-- Admin actions -->
+        <%= if @current_user && @current_user.role in ["admin", "superuser"] do %>
+          <form action={~p"/users/admin"} method="post" style="display:inline;">
+            <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+            <input type="hidden" name="user_id" value={user.id} />
+            <button type="submit">Toggle Admin</button>
+          </form>
+          <form action={~p"/users/upgrade"} method="post" style="display:inline;">
+            <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+            <input type="hidden" name="user_id" value={user.id} />
+            <button type="submit">Upgrade Plan</button>
+          </form>
+        <% end %>
 
-      <!-- ================= Superuser Management ================= -->
-      <form method="post" action="/users/superuser">
-        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-        <h2>Manage Superuser Access</h2>
-        <input type="text" name="user_id" placeholder="User ID" required />
-        <select name="action" required>
-          <option value="">Select Action</option>
-          <option value="grant">Grant Superuser</option>
-          <option value="revoke">Revoke Superuser</option>
-        </select>
-        <button type="submit">Update Superuser Access</button>
-      </form>
-
-      <form method="post" action="/users/upgrade">
-        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-        <h2>Upgrade User to Gold</h2>
-        <input type="text" name="user_id" placeholder="User ID" required />
-        <button type="submit">Upgrade</button>
-      </form>
-
-      <!-- ================= Admin Management ================= -->
-      <div>
-        <h2>Users List</h2>
-        <ul>
-          <%= for user <- @users do %>
-            <li>
-              <%= user.first_name %> <%= user.last_name %> (<%= user.email_address %>)
-              - <strong>Role:</strong> <%= user.role %> | <strong>Plan:</strong> <%= user.plan %>
-              <%= if user.superuser do %> | <strong>Superuser</strong> <% end %>
-            </li>
-          <% end %>
-        </ul>
-      </div>
-
-      <form method="post" action="/users/delete">
-        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-        <h2>Delete User</h2>
-        <input type="text" name="user_id" placeholder="User ID to delete" required />
-        <button type="submit">Delete User</button>
-      </form>
-
-      <form method="post" action="/users/admin">
-        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-        <h2>Manage Admin Access</h2>
-        <input type="text" name="user_id" placeholder="User ID" required />
-        <select name="action" required>
-          <option value="">Select Action</option>
-          <option value="grant">Grant Admin</option>
-          <option value="revoke">Revoke Admin</option>
-        </select>
-        <button type="submit">Update Access</button>
-      </form>
-
-      <!-- ================= Gold Features ================= -->
-      <form method="post" action="/emails/retry">
-        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-        <h2>Retry Failed Emails</h2>
-        <input type="text" name="email_id" placeholder="Email ID" required />
-        <button type="submit">Retry</button>
-      </form>
-
-      <form method="post" action="/groups">
-        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-        <h2>Create Group</h2>
-        <input type="text" name="group[name]" placeholder="Group Name" required />
-        <button type="submit">Create Group</button>
-      </form>
-
-      <form method="post" action="/group_contacts">
-        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-        <h2>Add Contact to Group</h2>
-        <select name="group_contact[group_id]" required>
-          <option value="">Select Group</option>
-          <%= for group <- @groups do %>
-            <option value={group.id}><%= group.name %></option>
-          <% end %>
-        </select>
-        <select name="group_contact[contact_id]" required>
-          <option value="">Select Contact</option>
-          <%= for contact <- @contacts do %>
-            <option value={contact.id}><%= contact.name %></option>
-          <% end %>
-        </select>
-        <button type="submit">Add Contact</button>
-      </form>
-
-      <form method="post" action="/emails/group">
-        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
-        <h2>Send Email to Group</h2>
-        <select name="email[group_id]" required>
-          <option value="">Select Group</option>
-          <%= for group <- @groups do %>
-            <option value={group.id}><%= group.name %></option>
-          <% end %>
-        </select>
-        <input type="text" name="email[subject]" placeholder="Subject" required />
-        <textarea name="email[body]" placeholder="Email body" required rows="4"></textarea>
-        <button type="submit">Send Email</button>
-      </form>
-
-      <div style="margin-top: 1rem;">
-        <h2>Group Email Status</h2>
-        <ul>
-          <%= for group <- @groups do %>
-            <li>
-              <strong><%= group.name %></strong>
-              <% group_emails = Enum.filter(@emails, &(&1.group_id == group.id)) %>
-              <% sent = Enum.count(Enum.filter(group_emails, &(&1.status == "sent"))) %>
-              <% pending = Enum.count(Enum.filter(group_emails, &(&1.status == "pending"))) %>
-              <% failed = Enum.filter(group_emails, &(&1.status == "failed")) %>
-
-              — Sent: <%= sent %>, Pending: <%= pending %>, Failed: <%= length(failed) %>
-
-              <%= if length(failed) > 0 do %>
-                <ul>
-                  <%= for f <- failed do %>
-                    <li>Failed Email ID: <%= f.id %></li>
-                  <% end %>
-                </ul>
-              <% end %>
-            </li>
-          <% end %>
-        </ul>
-      </div>
-    </section>
-  <% end %>
+        <!-- Superuser actions -->
+        <%= if @current_user && @current_user.role == "superuser" do %>
+          <form action={~p"/users/superuser"} method="post" style="display:inline;">
+            <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+            <input type="hidden" name="user_id" value={user.id} />
+            <button type="submit">Toggle Superuser</button>
+          </form>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
 </div>

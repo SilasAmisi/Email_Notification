@@ -21,16 +21,17 @@ defmodule EmailNotificationWeb.UserController do
           _ -> nil
         end
 
-      user_id -> Repo.get(User, user_id)
+      user_id ->
+        Repo.get(User, user_id)
     end
   end
 
   # Authorization helpers
   defp authorize_admin!(%User{role: "admin"}), do: :ok
-  defp authorize_admin!(%User{superuser: true}), do: :ok
+  defp authorize_admin!(%User{role: "superuser"}), do: :ok
   defp authorize_admin!(_), do: {:error, :forbidden}
 
-  defp authorize_superuser!(%User{superuser: true}), do: :ok
+  defp authorize_superuser!(%User{role: "superuser"}), do: :ok
   defp authorize_superuser!(_), do: {:error, :forbidden}
 
   # ==================================================
@@ -54,7 +55,7 @@ defmodule EmailNotificationWeb.UserController do
     user = Accounts.get_user!(id)
 
     cond do
-      current && current.superuser -> render_user(conn, user)
+      current && current.role == "superuser" -> render_user(conn, user)
       current && current.role == "admin" -> render_user(conn, user)
       current && current.id == user.id -> render_user(conn, user)
       true -> send_resp(conn, :forbidden, "Access denied")
@@ -102,7 +103,7 @@ defmodule EmailNotificationWeb.UserController do
     user_params = normalize_email_params(user_params)
 
     cond do
-      current && current.superuser -> do_update(conn, user, user_params)
+      current && current.role == "superuser" -> do_update(conn, user, user_params)
       current && current.role == "admin" -> do_update(conn, user, user_params)
       current && current.id == user.id -> do_update(conn, user, user_params)
       true -> send_resp(conn, :forbidden, "Access denied")
@@ -151,7 +152,9 @@ defmodule EmailNotificationWeb.UserController do
   # Login (session-based + JSON)
   def login(conn, %{"email_address" => email, "password" => password}) do
     case Repo.get_by(User, email_address: email) do
-      nil -> invalid_credentials(conn)
+      nil ->
+        invalid_credentials(conn)
+
       user ->
         if user.password == password do
           conn
@@ -161,8 +164,7 @@ defmodule EmailNotificationWeb.UserController do
             message: "Login successful",
             user_id: user.id,
             username: user.username,
-            role: user.role,
-            superuser: user.superuser
+            role: user.role
           })
         else
           invalid_credentials(conn)
@@ -211,27 +213,27 @@ defmodule EmailNotificationWeb.UserController do
     end
   end
 
-  # Manage superuser rights (grant/revoke) – only existing superuser can do this
+  # Manage superuser rights (grant/revoke) – only superuser can do this
   def update_superuser(conn, %{"user_id" => user_id, "action" => action}) do
     with %User{} = current <- get_current_user(conn),
          :ok <- authorize_superuser!(current),
          user <- Repo.get(User, user_id) do
-      new_flag =
+      new_role =
         case action do
-          "grant" -> true
-          "revoke" -> false
-          _ -> user.superuser
+          "grant" -> "superuser"
+          "revoke" -> "frontend"
+          _ -> user.role
         end
 
-      case Accounts.update_user(user, %{"superuser" => new_flag}) do
+      case Accounts.update_user(user, %{"role" => new_role}) do
         {:ok, _updated} ->
           conn
-          |> put_flash(:info, "Superuser flag updated")
+          |> put_flash(:info, "Superuser role updated")
           |> redirect(to: "/")
 
         {:error, _changeset} ->
           conn
-          |> put_flash(:error, "Failed to update superuser flag")
+          |> put_flash(:error, "Failed to update superuser role")
           |> redirect(to: "/")
       end
     else
