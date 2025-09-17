@@ -29,7 +29,8 @@ config :email_notification, EmailNotificationWeb.Endpoint,
 #
 # For production it's recommended to configure a different adapter
 # at the `config/runtime.exs`.
-config :email_notification, EmailNotification.Mailer, adapter: Swoosh.Adapters.Local
+config :email_notification, EmailNotification.Mailer,
+  adapter: Swoosh.Adapters.Local
 
 # Configure esbuild (the version is required)
 config :esbuild,
@@ -56,7 +57,11 @@ config :tailwind,
 config :email_notification, Oban,
   repo: EmailNotification.Repo,
   plugins: [Oban.Plugins.Pruner],  # cleans up old jobs
-  queues: [default: 10, mailers: 20, priority: 5]
+  queues: [
+    default: 10,   # general background tasks
+    emails: 20,    # queue for email delivery
+    priority: 5    # lower concurrency for critical jobs
+  ]
 
 # Configures Elixir's Logger
 config :logger, :default_formatter,
