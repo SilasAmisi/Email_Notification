@@ -232,6 +232,7 @@
           <form action={~p"/users/upgrade"} method="post" style="display:inline;">
             <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
             <input type="hidden" name="user_id" value={user.id} />
+            <input type="hidden" name="action" value={if user.plan == "gold", do: "downgrade", else: "upgrade"} />
             <button type="submit">
               <%= if user.plan == "gold", do: "Downgrade to Standard", else: "Upgrade to Gold" %>
             </button>

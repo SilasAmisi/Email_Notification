@@ -244,24 +244,32 @@ defmodule EmailNotificationWeb.UserController do
     end
   end
 
-  # Upgrade user to gold plan – superuser only
+  # Upgrade/downgrade user plan – superuser only
   def upgrade(conn, %{"user_id" => user_id}) do
     with %User{} = current <- get_current_user(conn),
          :ok <- authorize_superuser!(current),
-         %User{} = user <- Repo.get(User, user_id),
-         {:ok, _updated} <- Accounts.update_user(user, %{"plan" => "gold"}) do
-      conn
-      |> put_flash(:info, "User upgraded to gold")
-      |> redirect(to: "/")
+         %User{} = user <- Repo.get(User, user_id) do
+      new_plan =
+        case user.plan do
+          "gold" -> "standard"
+          _ -> "gold"
+        end
+
+      case Accounts.update_user(user, %{"plan" => new_plan}) do
+        {:ok, _updated} ->
+          conn
+          |> put_flash(:info, "User plan updated to #{new_plan}")
+          |> redirect(to: "/")
+
+        {:error, _changeset} ->
+          conn
+          |> put_flash(:error, "Failed to update user plan")
+          |> redirect(to: "/")
+      end
     else
       nil ->
         conn
         |> put_flash(:error, "User not found")
-        |> redirect(to: "/")
-
-      {:error, _changeset} ->
-        conn
-        |> put_flash(:error, "Failed to upgrade user")
         |> redirect(to: "/")
 
       _ ->
