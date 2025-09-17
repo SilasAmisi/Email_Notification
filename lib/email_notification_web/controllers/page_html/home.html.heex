@@ -207,7 +207,7 @@
         <!-- Delete -->
         <form action={~p"/users/delete"} method="post" class="danger" style="display:inline;">
           <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
-          <input type="hidden" name="user_id" value={user.id} />
+          <input type="hidden" name="id" value={user.id} />
           <button type="submit">Delete</button>
         </form>
 
